@@ -1,0 +1,11 @@
+# can be installed via "pip install -r requirements.txt"
+numpy
+pandas
+scipy
+statsmodels
+pingouin
+matplotlib
+seaborn
+plotly
+scikit-learn
+notebook

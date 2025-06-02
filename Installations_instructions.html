@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Setup Instructions</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            display: flex;
+        }
+        .sidebar {
+            width: 200px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+        }
+        .sidebar h2 {
+            color: white;
+        }
+        .sidebar button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        .sidebar button:hover {
+            background-color: #45a049;
+        }
+        .content {
+            padding: 20px;
+            width: 100%;
+        }
+        .section {
+            display: none;
+        }
+        .section.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="sidebar">
+        <h2>Select System</h2>
+        <button onclick="showSection('windows')">Windows</button>
+        <button onclick="showSection('macos')">macOS</button>
+        <button onclick="showSection('linux')">Linux</button>
+    </div>
+
+    <div class="content">
+  <div id="windows" class="section">
+    <h2>Windows</h2>
+    <p>Follow the steps below to install Python, set up a virtual environment, and install the required packages:</p>
+
+<h3>Step 1: Download and Install Python</h3>
+<ol>
+  <li><strong>Check if Python is Already Installed:</strong>
+    <ul>
+      <li>Open Command Prompt (press Windows + R, type <code>cmd</code>, and press Enter).</li>
+      <li>First, check the Python version by typing:
+        <pre>python --version</pre>
+      </li>
+      <li>If Python is not found, try checking with the <code>py</code> command:
+        <pre>py --version</pre>
+      </li>
+      <li>If either command returns a version number, Python is already installed, and you can skip to Step 2.</li>
+      <li>If both commands return an error like "Python not found", proceed to the next step to install Python.</li>
+    </ul>
+  </li>
+  <li><strong>If Python is Not Installed, Download Python:</strong>
+    <ul>
+      <li>Visit the official Python website: <a href="https://www.python.org/downloads/">python.org</a>.</li>
+      <li>Download the latest version of Python for Windows.</li>
+    </ul>
+  </li>
+  <li><strong>Run the Installer:</strong>
+    <ul>
+      <li>Open the Python installer.</li>
+      <li><strong>Important:</strong> Check the box that says "Add Python to PATH" at the bottom of the installer window. This ensures Python and pip can be accessed from the Command Prompt.</li>
+      <li>Click "Install Now" and wait for the installation to complete.</li>
+    </ul>
+  </li>
+  <li><strong>Verify Python Installation:</strong>
+    <ul>
+      <li>Open Command Prompt again and check the Python version by typing:
+        <pre>python --version</pre>
+      </li>
+    </ul>
+  </li>
+  <li><strong>If This Doesn’t Work:</strong>
+    <ul>
+      <li>If you receive an error like "Python not found", you'll need to add Python to the system's PATH manually (explained below). Alternatively, you can use the <code>py</code> command (explained in Step 5).</li>
+    </ul>
+  </li>
+</ol>
+
+
+    <h3>Step 2: Add Python to PATH (If Not Done During Installation)</h3>
+<p>If Python isn't recognized by the <code>python</code> command (or the <code>py</code> command), you may need to manually add Python to your system’s PATH.</p>
+    <ol>
+      <li><strong>Find Python Installation Directory:</strong>
+        <ul>
+          <li>Navigate to the directory where Python was installed. Common locations are:
+            <ul>
+              <li><code>C:\Users\<your-username>\AppData\Local\Programs\Python\Python<version>\</code></li>
+              <li>Or <code>C:\Program Files\PythonXX\</code> (replace <code>XX</code> with your version number).</li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+      <li><strong>Add Python to PATH:</strong>
+        <ul>
+          <li>Right-click the <strong>Start</strong> button and select <strong>System</strong>.</li>
+          <li>In the <strong>System</strong> window, click <strong>Advanced system settings</strong> on the right.</li>
+          <li>In the <strong>System Properties</strong> window, click <strong>Environment Variables</strong>.</li>
+          <li>Under <strong>System variables</strong>, scroll down and find <strong>Path</strong>, then click <strong>Edit</strong>.</li>
+          <li>Click <strong>New</strong>, and paste the full path to the folder where <code>python.exe</code> is located (e.g., <code>C:\Users\<your-username>\AppData\Local\Programs\Python\Python<version></code>).</li>
+          <li>Click <strong>New</strong> again, and add the path to Python's <strong>Scripts</strong> folder (e.g., <code>C:\Users\<your-username>\AppData\Local\Programs\Python\Python<version>\Scripts</code>).</li>
+        </ul>
+      </li>
+      <li><strong>Save and Restart:</strong>
+        <ul>
+          <li>Click <strong>OK</strong> to close all windows and save the changes.</li>
+          <li>Restart Command Prompt and try running:
+            <pre>python --version</pre>
+          </li>
+        </ul>
+      </li>
+    </ol>
+
+    <h3>Step 3: Use <code>py</code> Instead of <code>python</code> (If <code>python</code> Does Not Work)</h3>
+    <p>If, after setting the PATH, <code>python --version</code> still doesn’t work, Windows often installs Python with the <code>py</code> launcher. You can use <code>py</code> instead of <code>python</code> for all Python-related commands.</p>
+    <ul>
+      <li>To check the Python version, use:
+        <pre>py --version</pre>
+      </li>
+      <li>To start Python using <code>py</code>, simply type:
+        <pre>py</pre>
+      </li>
+    </ul>
+
+    <h3>Step 4: Verify pip Installation</h3>
+    <p><code>pip</code> is the package manager for Python, and it’s installed automatically with Python. However, you can verify that <code>pip</code> is working properly.</p>
+    <ol>
+      <li><strong>Check pip:</strong>
+        <ul>
+          <li>Open Command Prompt, and type:
+            <pre>pip --version</pre>
+          </li>
+          <li>If you see a version number, <code>pip</code> is installed and working.</li>
+        </ul>
+      </li>
+      <li><strong>If pip is Not Installed:</strong>
+        <ul>
+          <li>Download <code>get-pip.py</code> from <a href="https://bootstrap.pypa.io/get-pip.py">https://bootstrap.pypa.io/get-pip.py</a>.</li>
+          <li>Open Command Prompt, navigate to where you downloaded <code>get-pip.py</code>, and run:
+            <pre>python get-pip.py</pre>
+            If <code>python</code> doesn’t work, use the following command instead:
+            <pre>py get-pip.py</pre>
+          </li>
+        </ul>
+      </li>
+      <li><strong>Verify pip Installation Again:</strong>
+        <ul>
+          <li>After installing <code>pip</code>, you can verify it by running:
+            <pre>pip --version</pre>
+          </li>
+        </ul>
+      </li>
+    </ol>
+
+    <h3>Step 5: Create a Virtual Environment</h3>
+    <p>Once Python and pip are installed, it's good practice to create a virtual environment for your project to avoid conflicts with other Python projects.</p>
+    <ol>
+      <li><strong>Create the Virtual Environment:</strong>
+        <ul>
+          <li>Open Command Prompt, navigate to your project folder, and run:
+            <pre>python -m venv datascience</pre>
+            If <code>python</code> doesn’t work, use the following command instead:
+            <pre>py -m venv datascience</pre>
+          </li>
+        </ul>
+      </li>
+      <li><strong>Activate the Virtual Environment:</strong>
+        <ul>
+          <li>On Windows, activate the environment by running:
+            <pre>datascience\Scripts\activate</pre>
+          </li>
+          <li>You should now see <code>(datascience)</code> appear before your command prompt, indicating the virtual environment is active.</li>
+        </ul>
+      </li>
+    </ol>
+
+<h3>Step 6: Install Packages from <code>requirements.txt</code></h3>
+<p>Once your virtual environment is set up, you can install all the necessary packages from a <code>requirements.txt</code> file. This file contains a list of all the required packages for your project.</p>
+<ol>
+  <li><strong>Ensure the Virtual Environment is Activated:</strong> (you should see <code>(datascience)</code> before the prompt).</li>
+  <li><strong>Install Packages:</strong>
+    <ul>
+      <li>Before installing, make sure you're in the directory containing your <code>requirements.txt</code> file. You can use the <code>cd</code> (change directory) command in the terminal to navigate to that folder. For example, if your file is located in the "Documents" folder:</li>
+      <pre>cd ~/Documents</pre>
+      <li>Once you are in the correct folder, run the following command to install all the packages in the <code>datascience</code> environment:</li>
+      <pre>pip install -r requirements.txt</pre>
+    </ul>
+  </li>
+</ol>
+
+
+    <h3>Step 7: Deactivate the Virtual Environment (Optional)</h3>
+    <p>Once you're done working in the virtual environment, you can deactivate it to return to your system's default Python environment.</p>
+    <ol>
+      <li><strong>Deactivate:</strong>
+        <ul>
+          <li>To deactivate the virtual environment, simply type:
+            <pre>deactivate</pre>
+          </li>
+        </ul>
+      </li>
+    </ol>
+
+    <h3>Additional Notes</h3>
+    <ul>
+      <li>The virtual environment isolates your project's dependencies, so they don’t conflict with other Python projects you may have on your system.</li>
+      <li>After activating the virtual environment and installing the packages, you can work on your project without worrying about interfering with other projects or system-wide Python packages.</li>
+    </ul>
+
+  </div>
+  
+    <div id="macos" class="section">
+        <h2>macOS</h2>
+
+<h3>Step 1: Install Python</h3>
+<p>macOS comes with Python 2 pre-installed, but you’ll need Python 3.</p>
+<ol>
+    <li><strong>Check if Python 3 is installed:</strong> 
+        <p>Open Terminal and check if Python is installed by typing:</p>
+        <pre>python3 --version</pre>
+        <p>If Python 3 is already installed, you’ll see the version number.</p>
+        <p>If Python 3 is not installed, proceed to the next step to install it.</p>
+    </li>
+    <li><strong>If Python is Not Installed, Install Python 3:</strong> The recommended way to install Python 3 is via Homebrew. If you don’t have Homebrew installed, first install it by running:
+        <pre>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</pre>
+        Then, install Python by running:
+        <pre>brew install python</pre>
+    </li>
+    <li><strong>Verify the Installation:</strong> Confirm Python 3 and pip3 are installed:
+        <pre>python3 --version</pre>
+        <pre>pip3 --version</pre>
+    </li>
+</ol>
+
+        <h3>Step 2: Create New Environment and Install Packages</h3>
+        <ol>
+            <li><strong>Install virtualenv if not installed:</strong> Install virtualenv with pip:
+                <pre>pip3 install virtualenv</pre>
+            </li>
+            <li><strong>Create the datascience environment:</strong> Create a new virtual environment named <code>datascience</code>:
+                <pre>python3 -m venv datascience</pre>
+            </li>
+            <li><strong>Activate the environment:</strong> Activate the virtual environment:
+                <pre>source datascience/bin/activate  # Linux/macOS</pre>
+            </li>
+<li><strong>Install all required packages from <code>requirements.txt</code>:</strong> 
+    <p>First, navigate to the folder where your <code>requirements.txt</code> file is located. You can do this using the <code>cd</code> (change directory) command in the terminal. For example, if your file is located in the "Documents" folder:</p>
+    <pre>cd ~/Documents</pre>
+    <p>Once you are in the correct folder, run the following command to install all the packages in the <code>datascience</code> environment:</p>
+    <pre>pip install -r requirements.txt</pre>
+</li>
+
+            <li><strong>Verify the installations:</strong> To confirm everything was installed correctly, use:
+                <pre>pip list</pre>
+            </li>
+        </ol>
+
+        <h3>Optional: Verify Everything is Working</h3>
+        <ol>
+            <li><strong>Run a quick Python command to ensure everything is working:</strong>
+                <pre>python -c "print('Python is working!')" </pre>
+            </li>
+            <li><strong>Start Jupyter Notebook:</strong>
+                <pre>jupyter notebook</pre>
+            </li>
+        </ol>
+
+    </div>
+
+<div id="linux" class="section">
+    <h2>Linux</h2>
+    <p>Follow the steps below to install Python, set up a virtual environment, and install the required packages:</p>
+
+    <h3>Step 1: Install Python</h3>
+    <ol>
+      <li><strong>Install Python via Package Manager:</strong>
+        <ul>
+          <li>Open your terminal and use the appropriate package manager for your distribution to install Python.</li>
+          <li>For Ubuntu/Debian-based systems, run:
+            <pre>sudo apt update && sudo apt install python3 python3-pip python3-venv</pre>
+          </li>
+          <li>For Fedora-based systems, use:
+            <pre>sudo dnf install python3 python3-pip python3-venv</pre>
+          </li>
+          <li>For Arch-based systems, use:
+            <pre>sudo pacman -S python python-pip python-virtualenv</pre>
+          </li>
+        </ul>
+      </li>
+      <li><strong>Verify Python Installation:</strong>
+        <ul>
+          <li>Once installed, check the Python version by typing:
+            <pre>python3 --version</pre>
+          </li>
+        </ul>
+      </li>
+    </ol>
+
+    <h3>Step 2: Verify pip Installation</h3>
+    <p><code>pip</code> is the package manager for Python, and it’s installed automatically with Python. You can verify if <code>pip</code> is working with the following steps:</p>
+    <ol>
+      <li><strong>Check pip:</strong>
+        <ul>
+          <li>Open your terminal, and type:
+            <pre>pip3 --version</pre>
+          </li>
+          <li>If you see a version number, <code>pip</code> is installed and working.</li>
+        </ul>
+      </li>
+      <li><strong>If pip is Not Installed:</strong>
+        <ul>
+          <li>Run the following command to install <code>pip</code>:
+            <pre>sudo apt install python3-pip</pre>
+          </li>
+        </ul>
+      </li>
+    </ol>
+
+    <h3>Step 3: Create a Virtual Environment</h3>
+    <p>Once Python and pip are installed, it's a good practice to create a virtual environment for your project to avoid conflicts with other Python projects.</p>
+    <ol>
+      <li><strong>Create the Virtual Environment:</strong>
+        <ul>
+          <li>Navigate to your project folder in the terminal and run:
+            <pre>python3 -m venv datascience</pre>
+          </li>
+        </ul>
+      </li>
+      <li><strong>Activate the Virtual Environment:</strong>
+        <ul>
+          <li>To activate the virtual environment, run:
+            <pre>source datascience/bin/activate</pre>
+          </li>
+          <li>You should now see <code>(datascience)</code> appear before your command prompt, indicating the virtual environment is active.</li>
+        </ul>
+      </li>
+    </ol>
+
+    <h3>Step 4: Install Packages from <code>requirements.txt</code></h3>
+    <p>Once your virtual environment is set up, you can install all the necessary packages from a <code>requirements.txt</code> file. This file contains a list of all the required packages for your project.</p>
+    <ol>
+      <li><strong>Ensure the Virtual Environment is Activated:</strong> (you should see <code>(datascience)</code> before the prompt).</li>
+      <li><strong>Install Packages:</strong>
+        <ul>
+          <li>In the same directory as <code>requirements.txt</code>, run:
+            <pre>pip install -r requirements.txt</pre>
+          </li>
+        </ul>
+      </li>
+    </ol>
+
+    <h3>Step 5: Deactivate the Virtual Environment (Optional)</h3>
+    <p>Once you're done working in the virtual environment, you can deactivate it to return to your system's default Python environment.</p>
+    <ol>
+      <li><strong>Deactivate:</strong>
+        <ul>
+          <li>To deactivate the virtual environment, simply type:
+            <pre>deactivate</pre>
+          </li>
+        </ul>
+      </li>
+    </ol>
+
+    <h3>Additional Notes</h3>
+    <ul>
+      <li>The virtual environment isolates your project's dependencies, so they don’t conflict with other Python projects you may have on your system.</li>
+      <li>After activating the virtual environment and installing the packages, you can work on your project without worrying about interfering with other projects or system-wide Python packages.</li>
+    </ul>
+
+</div>
+    </div>
+</div>
+
+<script>
+    function showSection(system) {
+        // Hide all sections
+        var sections = document.querySelectorAll('.section');
+        sections.forEach(function (section) {
+            section.classList.remove('active');
+        });
+
+        // Show the selected section
+        var selectedSection = document.getElementById(system);
+        selectedSection.classList.add('active');
+    }
+</script>
+
+</body>
+</html>
