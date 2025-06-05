@@ -116,3 +116,31 @@ def downsample_history(*histories, k=5):
     """
     
     return tuple([h[::k] for h in histories])
+
+def simple_matching_distance(X):
+    n = X.shape[0]
+    smd = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            matches = np.sum(X[i] == X[j])
+            sm_coef = matches / X.shape[1]
+            smd[i, j] = 1 - sm_coef  # Distance = 1 - similarity
+    return smd
+
+def pairwise_hamming_distance_similarity(X):
+    """
+    Efficiently compute the pairwise Hamming distance (count of differing elements)
+    and similarity (count of matching elements) matrices for a 2D numpy array X.
+
+    Returns:
+        dist (n x n numpy array): dist[i, j] is the Hamming distance (count) between X[i] and X[j]
+        sim (n x n numpy array): sim[i, j] is the number of matches between X[i] and X[j]
+    """
+    n, m = X.shape
+    dist = np.zeros((n, n), dtype=int)
+    for i in range(n):
+        for j in range(i+1, n):  # Only upper triangle
+            differences = np.sum(X[i] != X[j])
+            dist[i, j] = differences
+            dist[j, i] = differences  # Symmetry
+    return dist
