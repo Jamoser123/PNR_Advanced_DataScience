@@ -9,3 +9,8 @@ seaborn
 plotly
 scikit-learn
 notebook
+umap-learn
+gower
+kmedoids
+xgboost
+lightgbm
