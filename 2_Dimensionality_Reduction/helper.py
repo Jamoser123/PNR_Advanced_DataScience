@@ -117,6 +117,7 @@ def downsample_history(*histories, k=5):
     
     return tuple([h[::k] for h in histories])
 
+### Dimensionality Reduction and Similarity Measures
 def simple_matching_distance(X):
     n = X.shape[0]
     smd = np.zeros((n, n))
@@ -144,3 +145,84 @@ def pairwise_hamming_distance_similarity(X):
             dist[i, j] = differences
             dist[j, i] = differences  # Symmetry
     return dist
+
+def plot_mnist(mnist):
+  X, y = mnist["data"], mnist["target"].astype(int)  # Convert labels to int
+
+  # Display 10 sample images
+  fig, axes = plt.subplots(1, 10, figsize=(12, 1.5))
+  for i, ax in enumerate(axes):
+      ax.imshow(X[i].reshape(28, 28), cmap="gray")
+      ax.set_title(str(y[i]), fontsize=12)
+      ax.axis("off")
+  plt.suptitle("Sample images from the MNIST dataset", fontsize=16, y=1.05)
+  plt.show()
+
+def plot_distance_comparison(point_A, point_B):
+    # Create figure and axis
+    fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+
+    # Plot the points
+    ax.scatter(*point_A, color='blue', s=100, zorder=5, label='Point A (1, 1)')
+    ax.scatter(*point_B, color='red', s=100, zorder=5, label='Point B (6, 5)')
+
+    # Euclidean distance (straight line)
+    ax.plot([point_A[0], point_B[0]], [point_A[1], point_B[1]], 
+            color='blue', linewidth=3, label='Euclidean Distance', alpha=0.8)
+
+    # Manhattan distance (L-shaped path)
+    # First go horizontally, then vertically
+    ax.plot([point_A[0], point_B[0]], [point_A[1], point_A[1]], 
+            color='orange', linewidth=3, alpha=0.8)
+    ax.plot([point_B[0], point_B[0]], [point_A[1], point_B[1]], 
+            color='orange', linewidth=3, alpha=0.8, label='Manhattan Distance')
+
+    # Add grid
+    ax.grid(True, alpha=0.3)
+    ax.set_aspect('equal')
+
+    # Calculate and display distances
+    euclidean_dist = np.sqrt((point_B[0] - point_A[0])**2 + (point_B[1] - point_A[1])**2)
+    manhattan_dist = abs(point_B[0] - point_A[0]) + abs(point_B[1] - point_A[1])
+
+    # Calculate the midpoints for annotations
+    mid_x = (point_A[0] + point_B[0]) / 2
+    mid_y = (point_A[1] + point_B[1]) / 2
+
+    # Add distance annotations
+    ax.text(mid_x, mid_y, f'Euclidean: {euclidean_dist:.2f}', 
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.7),
+            fontsize=12, ha='center')
+
+    ax.text(point_B[0], point_A[1], f'Manhattan: {manhattan_dist:.2f}', 
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="lightyellow", alpha=0.7),
+            fontsize=12, ha='center')
+
+    # Labels and title
+    ax.set_xlabel('X Coordinate', fontsize=14)
+    ax.set_ylabel('Y Coordinate', fontsize=14)
+    ax.set_title('Euclidean vs Manhattan Distance Visualization', fontsize=16, fontweight='bold')
+
+    # Get min and max for axis limits
+    min_x = min(point_A[0], point_B[0]) - 2
+    max_x = max(point_A[0], point_B[0]) + 2
+    min_y = min(point_A[1], point_B[1]) - 2
+    max_y = max(point_A[1], point_B[1]) + 2
+
+    # Set axis limits
+    ax.set_xlim(min_x, max_x)
+    ax.set_ylim(min_y, max_y)
+
+    # Add legend
+    ax.legend(loc='upper left', fontsize=12)
+
+    # Adjust layout to make room for text at bottom
+    plt.subplots_adjust(bottom=0.15)
+
+    # Add explanatory text (moved higher)
+    plt.figtext(0.15, 0.05, 
+            "Euclidean: Straight-line distance ('as the crow flies')\n"
+            "Manhattan: Sum of horizontal and vertical distances ('city block')", 
+            fontsize=10, style='italic')
+
+    plt.show()
