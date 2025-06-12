@@ -5,6 +5,7 @@ import numpy as np
 from itertools import cycle, islice
 from sklearn import cluster
 
+
 def normalize(data):
     # Normalize using training set statistics
     mean = data.mean()
