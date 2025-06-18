@@ -1,0 +1,279 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+import numpy as np
+from itertools import cycle, islice
+from sklearn import cluster
+
+def normalize(data):
+    # Normalize using training set statistics
+    mean = data.mean()
+    std = data.std()
+    return (data - mean) / std
+
+def train_linear_regression(X_train_norm, y_train, X_val_norm, y_val, learning_rate=0.01, n_iter=120):
+    # Initialize parameters
+    w0 = 0.0
+    w1 = 0.0
+    rmse_train_history = []
+    rmse_val_history = []
+    w0_history = []
+    w1_history = []
+
+    for i in range(n_iter):
+        # --- Training predictions and gradients ---
+        y_pred_train = w0 + w1 * X_train_norm
+        error_train = y_pred_train - y_train
+        rmse_train = np.sqrt(np.mean(error_train ** 2))
+        rmse_train_history.append(rmse_train)
+        
+        # --- Validation predictions ---
+        y_pred_val = w0 + w1 * X_val_norm
+        error_val = y_pred_val - y_val
+        rmse_val = np.sqrt(np.mean(error_val ** 2))
+        rmse_val_history.append(rmse_val)
+
+        # --- Store parameter history for plotting ---
+        w0_history.append(w0)
+        w1_history.append(w1)
+        
+        # --- Parameter updates using training gradients ---
+        grad_w0 = 2 * np.mean(error_train)
+        grad_w1 = 2 * np.mean(error_train * X_train_norm)
+        w0 -= learning_rate * grad_w0
+        w1 -= learning_rate * grad_w1
+
+    # Plot RMSE curves
+    plt.figure(figsize=(7,4))
+    plt.plot(rmse_train_history, label="Train RMSE")
+    plt.plot(rmse_val_history, label="Validation RMSE")
+    plt.xlabel('Iteration')
+    plt.ylabel('RMSE')
+    plt.title('Train & Validation RMSE During Optimization')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    return w0, w1, w0_history, w1_history, rmse_train_history
+
+def plot_rmse_loss_surface_with_arrow(X_norm, y, w0_hist, w1_hist, rmse_hist, w0_range_offset=70, w1_range_offset=70, grid_points=100):
+    # Closed-form solution for reference
+    X_design = np.vstack([np.ones_like(X_norm), X_norm]).T
+    opt_w = np.linalg.lstsq(X_design, y, rcond=None)[0]
+    opt_w0, opt_w1 = opt_w
+
+    print(f"Closed-form Optimum: w0 = {opt_w0:.3f}, w1 = {opt_w1:.3f}")
+    # print rmse of closed-form solution
+    y_pred_opt = opt_w0 + opt_w1 * X_norm
+    print(f"RMSE of Closed-form Optimum: {np.sqrt(np.mean((y - y_pred_opt) ** 2)):.3f}")
+
+    # Center grid around closed-form optimum
+    w0_range = np.linspace(opt_w0 - w0_range_offset, opt_w0 + w0_range_offset, grid_points)
+    w1_range = np.linspace(opt_w1 - w1_range_offset, opt_w1 + w1_range_offset, grid_points)
+    W0, W1 = np.meshgrid(w0_range, w1_range)
+    rmse_surface = np.zeros(W0.shape)
+
+    for i in range(W0.shape[0]):
+        for j in range(W0.shape[1]):
+            y_pred_grid = W0[i, j] + W1[i, j] * X_norm
+            rmse_surface[i, j] = np.sqrt(np.mean((y - y_pred_grid) ** 2))
+
+    fig = plt.figure(figsize=(10, 6))
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot_surface(W0, W1, rmse_surface, cmap='viridis', alpha=0.8)
+    ax.set_xlabel('Intercept (w0)')
+    ax.set_ylabel('Slope (w1)')
+    ax.set_zlabel('RMSE Loss')
+    ax.set_title('RMSE Loss Surface for Therapy Intensity')
+
+    ax.scatter(opt_w0, opt_w1, np.sqrt(np.mean((y - (opt_w0 + opt_w1 * X_norm))**2)), 
+               color='orange', s=150, label='Closed-form Optimum')
+    
+    if w0_hist is not None and w1_hist is not None and rmse_hist is not None:
+        ax.plot(w0_hist, w1_hist, rmse_hist, color='red', marker='o', linewidth=2, label='Gradient Descent Path')
+
+    ax.legend()
+    plt.show()
+
+    plt.figure(figsize=(7,5))
+    cp = plt.contourf(W0, W1, rmse_surface, levels=30, cmap='viridis')
+    plt.xlabel('Intercept (w0)')
+    plt.ylabel('Slope (w1)')
+    plt.title('RMSE Loss Contour (Therapy Intensity)')
+    plt.colorbar(cp, label='RMSE')
+    plt.scatter([opt_w0], [opt_w1], c='orange', label='Closed-form Optimum')
+
+    if w0_hist is not None and w1_hist is not None:
+        plt.plot(w0_hist, w1_hist, color='red', marker='o', linewidth=2, label='Gradient Descent Path')
+    
+    plt.legend()
+    plt.show()
+
+def create_formula(degree):
+    terms = ["Age_std"] + [f"I(Age_std**{i})" for i in range(2, degree + 1)]
+    return "Ferritin ~ " + " + ".join(terms)
+
+def downsample_history(*histories, k=5):
+    """
+    Downsample multiple histories (lists/arrays) to every k-th point.
+    Returns the downsampled histories as a tuple.
+    """
+    
+    return tuple([h[::k] for h in histories])
+
+### Dimensionality Reduction and Similarity Measures
+def simple_matching_distance(X):
+    n = X.shape[0]
+    smd = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            matches = np.sum(X[i] == X[j])
+            sm_coef = matches / X.shape[1]
+            smd[i, j] = 1 - sm_coef  # Distance = 1 - similarity
+    return smd
+
+def pairwise_hamming_distance_similarity(X):
+    """
+    Efficiently compute the pairwise Hamming distance (count of differing elements)
+    and similarity (count of matching elements) matrices for a 2D numpy array X.
+
+    Returns:
+        dist (n x n numpy array): dist[i, j] is the Hamming distance (count) between X[i] and X[j]
+        sim (n x n numpy array): sim[i, j] is the number of matches between X[i] and X[j]
+    """
+    n, m = X.shape
+    dist = np.zeros((n, n), dtype=int)
+    for i in range(n):
+        for j in range(i+1, n):  # Only upper triangle
+            differences = np.sum(X[i] != X[j])
+            dist[i, j] = differences
+            dist[j, i] = differences  # Symmetry
+    return dist
+
+def plot_mnist(mnist):
+  X, y = mnist["data"], mnist["target"].astype(int)  # Convert labels to int
+
+  # Display 10 sample images
+  fig, axes = plt.subplots(1, 10, figsize=(12, 1.5))
+  for i, ax in enumerate(axes):
+      ax.imshow(X[i].reshape(28, 28), cmap="gray")
+      ax.set_title(str(y[i]), fontsize=12)
+      ax.axis("off")
+  plt.suptitle("Sample images from the MNIST dataset", fontsize=16, y=1.05)
+  plt.show()
+
+def plot_distance_comparison(point_A, point_B):
+    # Create figure and axis
+    fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+
+    # Plot the points
+    ax.scatter(*point_A, color='blue', s=100, zorder=5, label='Point A (1, 1)')
+    ax.scatter(*point_B, color='red', s=100, zorder=5, label='Point B (6, 5)')
+
+    # Euclidean distance (straight line)
+    ax.plot([point_A[0], point_B[0]], [point_A[1], point_B[1]], 
+            color='blue', linewidth=3, label='Euclidean Distance', alpha=0.8)
+
+    # Manhattan distance (L-shaped path)
+    # First go horizontally, then vertically
+    ax.plot([point_A[0], point_B[0]], [point_A[1], point_A[1]], 
+            color='orange', linewidth=3, alpha=0.8)
+    ax.plot([point_B[0], point_B[0]], [point_A[1], point_B[1]], 
+            color='orange', linewidth=3, alpha=0.8, label='Manhattan Distance')
+
+    # Add grid
+    ax.grid(True, alpha=0.3)
+    ax.set_aspect('equal')
+
+    # Calculate and display distances
+    euclidean_dist = np.sqrt((point_B[0] - point_A[0])**2 + (point_B[1] - point_A[1])**2)
+    manhattan_dist = abs(point_B[0] - point_A[0]) + abs(point_B[1] - point_A[1])
+
+    # Calculate the midpoints for annotations
+    mid_x = (point_A[0] + point_B[0]) / 2
+    mid_y = (point_A[1] + point_B[1]) / 2
+
+    # Add distance annotations
+    ax.text(mid_x, mid_y, f'Euclidean: {euclidean_dist:.2f}', 
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.7),
+            fontsize=12, ha='center')
+
+    ax.text(point_B[0], point_A[1], f'Manhattan: {manhattan_dist:.2f}', 
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="lightyellow", alpha=0.7),
+            fontsize=12, ha='center')
+
+    # Labels and title
+    ax.set_xlabel('X Coordinate', fontsize=14)
+    ax.set_ylabel('Y Coordinate', fontsize=14)
+    ax.set_title('Euclidean vs Manhattan Distance Visualization', fontsize=16, fontweight='bold')
+
+    # Get min and max for axis limits
+    min_x = min(point_A[0], point_B[0]) - 2
+    max_x = max(point_A[0], point_B[0]) + 2
+    min_y = min(point_A[1], point_B[1]) - 2
+    max_y = max(point_A[1], point_B[1]) + 2
+
+    # Set axis limits
+    ax.set_xlim(min_x, max_x)
+    ax.set_ylim(min_y, max_y)
+
+    # Add legend
+    ax.legend(loc='upper left', fontsize=12)
+
+    # Adjust layout to make room for text at bottom
+    plt.subplots_adjust(bottom=0.15)
+
+    # Add explanatory text (moved higher)
+    plt.figtext(0.15, 0.05, 
+            "Euclidean: Straight-line distance ('as the crow flies')\n"
+            "Manhattan: Sum of horizontal and vertical distances ('city block')", 
+            fontsize=10, style='italic')
+
+    plt.show()
+
+def plot_dbscan_grid(dataset, eps_values, min_samples_values):
+    
+    fig = plt.figure(figsize=(16, 20))
+    plt.subplots_adjust(left=.02, right=.98, bottom=0.001, top=.96, wspace=.05,
+                        hspace=0.25)
+
+
+    plot_num = 1
+
+    for i, min_samples in enumerate(min_samples_values):
+        for j, eps in enumerate(eps_values):
+            ax = fig.add_subplot( len(min_samples_values) , len(eps_values), plot_num)
+
+            dbscan = cluster.DBSCAN(eps=eps, min_samples=min_samples)
+            y_pred_2 = dbscan.fit_predict(dataset)
+
+            colors = np.array(list(islice(cycle(['#df8efd', '#78c465', '#ff8e34',
+                                                 '#f65e97', '#a65628', '#984ea3',
+                                                 '#999999', '#e41a1c', '#dede00']),
+                                          int(max(y_pred_2) + 1))))
+            colors = np.append(colors, '#BECBD6')
+
+
+            for point in dataset:
+                circle1 = plt.Circle(point, eps, color='#666666', fill=False, zorder=0, alpha=0.3)
+                ax.add_artist(circle1)
+
+            ax.text(0, -0.03, 'Epsilon: {} \nMin_samples: {}'.format(eps, min_samples), transform=ax.transAxes, fontsize=16, va='top')
+            ax.scatter(dataset[:, 0], dataset[:, 1], s=50, color=colors[y_pred_2], zorder=10, edgecolor='black', lw=0.5)
+
+
+            plt.xticks(())
+            plt.yticks(())
+
+            # Calculate the limits for the plot
+            x_min, x_max = dataset[:, 0].min() - 1, dataset[:, 0].max() + 1
+            y_min, y_max = dataset[:, 1].min() - 1, dataset[:, 1].max() + 1
+            plt.xlim(x_min, x_max)
+            plt.ylim(y_min, y_max)
+
+            #plt.xlim(-14, 5)
+            #plt.ylim(-12, 7)
+
+            plot_num = plot_num + 1
+
+    plt.show()
