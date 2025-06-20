@@ -16,3 +16,6 @@ xgboost
 lightgbm
 pyreadr
 torch
+torchvision
+medmnist
+transformers
