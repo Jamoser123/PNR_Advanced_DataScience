@@ -2461,6 +2461,15 @@ def cross_validate_feature_range(X, y, num_coef=4, feature_counts=None):
     plt.show()
 
 def plot_pca_cumvar(pca):
+    """
+    Plots the cumulative explained variance of a fitted PCA object and indicates the number of components required to reach common variance thresholds.
+    Args:
+        pca (sklearn.decomposition.PCA): A fitted PCA object with the `explained_variance_ratio_` attribute.
+    Returns:
+        None: This function displays a matplotlib plot and does not return any value.
+    Notes:
+        The plot includes horizontal lines at 80%, 90%, and 95% explained variance, and annotates these thresholds for visual reference.
+    """
     # Calculate cumulative explained variance
     cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
 
@@ -2485,6 +2494,16 @@ def plot_pca_cumvar(pca):
     plt.show()
 
 def plot_coefs(coefs, title='True Coefficient Values'):
+    """
+    Plots the values of coefficients as a stem plot.
+
+    Args:
+        coefs (array-like): The coefficient values to plot. Should be a 1D array or list of numerical values.
+        title (str, optional): The title of the plot. Defaults to 'True Coefficient Values'.
+
+    Returns:
+        None: This function displays a plot and does not return any value.
+    """
   # Show true coefficients
     plt.figure(figsize=(10, 6))
     plt.stem(range(len(coefs)), coefs, basefmt=' ')
@@ -2496,6 +2515,24 @@ def plot_coefs(coefs, title='True Coefficient Values'):
     plt.show()
 
 def cross_validate_regularization(X, y, num_coef=8, alphas=np.logspace(-3, 3, 50), model_name="Ridge"):
+    """
+    Performs cross-validation for regularized linear regression models (Ridge, Lasso, ElasticNet) 
+    over a range of regularization strengths (alphas), plots the cross-validation error, 
+    and returns the optimal alpha.
+    Args:
+        X (array-like): Feature matrix of shape (n_samples, n_features).
+        y (array-like): Target vector of shape (n_samples,).
+        num_coef (int, optional): Number of coefficients to display or consider (not directly used in function). Defaults to 8.
+        alphas (array-like, optional): Sequence of regularization strengths to evaluate. Defaults to np.logspace(-3, 3, 50).
+        model_name (str, optional): Name of the regularization model to use. Must be one of "Ridge", "Lasso", or "ElasticNet". Defaults to "Ridge".
+    Returns:
+        float: The value of alpha that yields the lowest cross-validated mean squared error.
+    Raises:
+        ValueError: If `model_name` is not one of "Ridge", "Lasso", or "ElasticNet".
+    Notes:
+        - The function plots mean squared error (with standard deviation) as a function of log(alpha).
+        - The optimal alpha is highlighted on the plot.
+    """
   # Store cross-validation scores
     cv_scores = []
     cv_stds = []
@@ -2550,6 +2587,26 @@ def cross_validate_regularization(X, y, num_coef=8, alphas=np.logspace(-3, 3, 50
     return optimal_alpha
 
 def regularization_coef_progression(X, y, num_coef=8, alphas=np.logspace(-3, 3, 50), optimal_alpha=None, model_name="Ridge"):
+    """
+    Plots the progression of regression coefficients as a function of the regularization parameter (alpha)
+    for Ridge, Lasso, or ElasticNet regression models.
+    This function visualizes how the coefficients of each feature change as the regularization strength varies.
+    Signal features (first `num_coef` features) are highlighted with thick lines, while noise features are shown
+    with thin gray lines. Optionally, the optimal alpha can be indicated with a vertical dashed line.
+    Args:
+        X (np.ndarray or pd.DataFrame): Feature matrix of shape (n_samples, n_features).
+        y (np.ndarray or pd.Series): Target vector of shape (n_samples,).
+        num_coef (int, optional): Number of signal features to highlight. Defaults to 8.
+        alphas (array-like, optional): Sequence of alpha values to use for regularization. Defaults to np.logspace(-3, 3, 50).
+        optimal_alpha (float, optional): Value of the optimal alpha to highlight on the plot. Defaults to None.
+        model_name (str, optional): Type of regression model to use. Must be one of "Ridge", "Lasso", or "ElasticNet". Defaults to "Ridge".
+    Returns:
+        None: This function displays a matplotlib plot and does not return any value.
+    Raises:
+        ValueError: If `model_name` is not one of "Ridge", "Lasso", or "ElasticNet".
+    Example:
+        >>> regularization_coef_progression(X, y, num_coef=5, model_name="Lasso", optimal_alpha=0.1)
+    """
     # Plot coefficient paths for Ridge regression
     plt.figure(figsize=(12, 8))
 
@@ -2611,6 +2668,26 @@ def regularization_coef_progression(X, y, num_coef=8, alphas=np.logspace(-3, 3, 
     plt.show()
 
 def features_selected(X, y, n_features, n_informative, optimal_alpha, model_name="Lasso"):
+    """
+    Fits a regularized linear model (Lasso, Ridge, or ElasticNet) to the data and reports feature selection results.
+    The function fits the specified model with the given regularization strength (alpha), identifies selected features
+    (non-zero coefficients), and compares them to the true informative features. It prints a summary of selected features,
+    their coefficients, whether they are true signal features, and feature selection performance metrics.
+    Args:
+        X (np.ndarray or pd.DataFrame): Feature matrix of shape (n_samples, n_features).
+        y (np.ndarray or pd.Series): Target vector of shape (n_samples,).
+        n_features (int): Total number of features in the dataset.
+        n_informative (int): Number of true informative (signal) features (assumed to be the first n_informative features).
+        optimal_alpha (float): Regularization strength (alpha) to use for the model.
+        model_name (str, optional): Name of the model to use. Must be one of "Lasso", "Ridge", or "ElasticNet". Defaults to "Lasso".
+    Raises:
+        ValueError: If an unsupported model name is provided.
+    Prints:
+        - The total number of selected features and their indices.
+        - The coefficient values for selected features.
+        - Whether each selected feature is a true signal feature.
+        - Feature selection performance metrics: true positives, false positives, false negatives, precision, and recall.
+    """
 
     if model_name == "Lasso":
         model_fam = Lasso
@@ -2655,6 +2732,25 @@ def features_selected(X, y, n_features, n_informative, optimal_alpha, model_name
     print(f"False Negatives: {false_negatives}")
 
 def cross_validate_lambda_en(X, y, alphas=np.logspace(-5, 0, 50)):
+    """
+    Perform cross-validation to select the optimal regularization strength (alpha) and L1/L2 mixing ratio (l1_ratio) for ElasticNet regression.
+    This function evaluates ElasticNet models with different combinations of alpha (regularization strength) and l1_ratio (mixing between L1 and L2 penalties)
+    using cross-validation. It plots the mean squared error (MSE) for each combination and highlights the optimal alpha for each l1_ratio. The function also
+    prints a summary of the optimal parameters and their corresponding cross-validated MSE for each method (Ridge, ElasticNet, Lasso).
+    Args:
+        X (array-like or pd.DataFrame): Feature matrix of shape (n_samples, n_features).
+        y (array-like or pd.Series): Target vector of shape (n_samples,).
+        alphas (array-like, optional): Sequence of alpha values to test. Default is np.logspace(-5, 0, 50).
+    Returns:
+        tuple:
+            best_l1_ratio (float): The l1_ratio value with the lowest cross-validated MSE.
+            best_alpha (float): The alpha value corresponding to the best_l1_ratio with the lowest cross-validated MSE.
+    Raises:
+        ValueError: If X or y have incompatible shapes.
+    Displays:
+        - A plot of cross-validated MSE vs. log(alpha) for each l1_ratio.
+        - Prints a summary table of optimal alpha and MSE for each method.
+    """
     # Define range of alpha values and l1_ratio values
     l1_ratios = [0, 0.25, 0.5, 0.75, 1.0]  # Different mixing ratios
 
@@ -2719,6 +2815,24 @@ def cross_validate_lambda_en(X, y, alphas=np.logspace(-5, 0, 50)):
     return best_l1_ratio, best_alpha
 
 def compare_coefficients_mult_methods(X, y, pca_n=4, reg_results=None, feature_names=None):
+    """
+    Compare and visualize regression coefficients from multiple regularization methods.
+    This function fits Principal Component Regression (PCR), Ridge, Lasso, and ElasticNet models
+    to the provided data using optimal hyperparameters (as specified in `reg_results`), extracts
+    their coefficients, and plots a grouped bar chart to compare the coefficients for each feature
+    across the different methods.
+    Args:
+        X (array-like or pd.DataFrame): Feature matrix of shape (n_samples, n_features).
+        y (array-like): Target vector of shape (n_samples,).
+        pca_n (int, optional): Number of principal components to use in PCR. Defaults to 4.
+        reg_results (dict): Dictionary containing optimal hyperparameters for each method.
+            Expected keys: 'Ridge', 'Lasso', 'ElasticNet', each mapping to a dict with key 'optimal_alpha'.
+        feature_names (list of str): List of feature names corresponding to columns in X.
+    Raises:
+        ValueError: If `reg_results` is not provided.
+    Returns:
+        None: Displays a matplotlib plot comparing coefficients across methods.
+    """
     if reg_results is None:
         raise ValueError("Regularization results must be provided.")
     
@@ -2793,6 +2907,34 @@ def compare_coefficients_mult_methods(X, y, pca_n=4, reg_results=None, feature_n
     plt.show()
 
 def regularization_analysis(X, y, alphas_ridge=np.logspace(-1, 6, 50), alphas_lasso=np.logspace(-3, 2, 50), alphas_elastic=np.logspace(-3, 2, 50)):
+    """
+    Perform comparative analysis of Ridge, Lasso, and ElasticNet regularization on a dataset.
+    This function evaluates the effect of different regularization strengths (alpha) for Ridge, Lasso, 
+    and ElasticNet regression using cross-validation. It visualizes cross-validation MSE and coefficient 
+    shrinkage paths for each method, and prints a summary of optimal parameters and feature selection.
+    Args:
+        X (array-like or pd.DataFrame): Feature matrix of shape (n_samples, n_features).
+        y (array-like or pd.Series): Target vector of shape (n_samples,).
+        alphas_ridge (array-like, optional): Array of alpha values to test for Ridge regression. 
+            Defaults to np.logspace(-1, 6, 50).
+        alphas_lasso (array-like, optional): Array of alpha values to test for Lasso regression. 
+            Defaults to np.logspace(-3, 2, 50).
+        alphas_elastic (array-like, optional): Array of alpha values to test for ElasticNet regression. 
+            Defaults to np.logspace(-3, 2, 50).
+    Returns:
+        dict: A dictionary with keys 'Ridge', 'Lasso', and 'ElasticNet', each containing:
+            - 'alphas': Array of alpha values tested.
+            - 'cv_scores': Cross-validation mean squared errors for each alpha.
+            - 'cv_stds': Standard deviation of CV scores for each alpha.
+            - 'coefficients': Coefficient values for each alpha.
+            - 'optimal_alpha': Alpha value with the lowest CV MSE.
+            - 'optimal_score': Best (lowest) CV MSE.
+    Displays:
+        - Matplotlib figure with two rows:
+            - Top row: Cross-validation MSE vs log(alpha) for each method.
+            - Bottom row: Coefficient shrinkage paths vs log(alpha) for each method.
+        - Prints a summary of optimal alpha, best CV MSE, and number of features selected for each method.
+    """
     # Store results for reuse
     results = {}
 
