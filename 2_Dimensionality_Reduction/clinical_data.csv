@@ -1,0 +1,301 @@
+patient_id,age,gender,bmi,bp_systolic,cholesterol,glucose,heart_rate,smoking_status,education,medication,status
+P001,45.5,Female,23.7,105,228,107,70,Never,Bachelor,No,Healthy
+P002,52.2,Female,22.2,133,244,118,76,Former,PhD,Yes,Patient
+P003,85.0,Female,24.4,144,223,127,90,Current,PhD,No,Patient
+P004,67.6,Female,27.2,149,259,136,61,Former,Bachelor,No,Patient
+P005,20.7,Male,20.6,143,216,85,57,Never,Bachelor,No,Healthy
+P006,47.2,Female,22.5,105,143,122,57,Former,Bachelor,No,Healthy
+P007,37.1,Male,28.0,135,198,100,81,Never,PhD,Yes,Healthy
+P008,70.2,Male,24.7,142,251,145,101,Never,Master,No,Patient
+P009,50.5,Male,30.3,144,221,143,79,Former,High School,Yes,Patient
+P010,58.6,Male,22.5,155,271,153,78,Never,Bachelor,Yes,Patient
+P011,51.1,Female,26.1,103,175,94,71,Never,Bachelor,No,Healthy
+P012,70.4,Male,32.8,151,234,104,94,Current,Bachelor,No,Patient
+P013,45.6,Female,17.1,147,225,138,69,Never,High School,No,Patient
+P014,41.0,Male,20.8,127,180,77,73,Never,Master,No,Healthy
+P015,39.3,Male,26.3,124,147,79,82,Never,Bachelor,Yes,Healthy
+P016,37.2,Female,23.2,157,137,102,76,Never,Master,No,Healthy
+P017,66.2,Male,25.5,110,228,115,72,Current,Master,Yes,Healthy
+P018,64.9,Male,24.6,137,205,130,92,Never,Master,Yes,Patient
+P019,44.9,Female,27.3,136,200,136,50,Former,Bachelor,No,Patient
+P020,56.0,Male,23.4,112,120,124,78,Never,Bachelor,No,Healthy
+P021,85.0,Female,31.7,135,211,135,72,Never,High School,Yes,Patient
+P022,57.4,Male,25.0,138,140,142,50,Never,Bachelor,No,Healthy
+P023,26.8,Male,25.4,141,229,101,76,Former,High School,Yes,Healthy
+P024,39.2,Female,22.4,111,210,70,86,Current,Bachelor,Yes,Healthy
+P025,75.2,Male,25.0,133,209,145,78,Never,High School,No,Patient
+P026,51.5,Male,25.3,152,298,138,91,Former,High School,No,Patient
+P027,50.3,Male,25.6,112,209,116,89,Former,High School,No,Healthy
+P028,69.3,Male,25.3,154,220,143,96,Current,High School,Yes,Patient
+P029,48.9,Female,28.2,148,155,127,100,Former,Master,Yes,Patient
+P030,44.3,Male,32.3,97,249,70,79,Never,Master,No,Healthy
+P031,21.1,Female,30.5,168,188,126,81,Former,Bachelor,Yes,Patient
+P032,32.7,Female,22.7,147,131,73,51,Former,High School,No,Healthy
+P033,42.0,Male,28.8,111,211,78,67,Former,High School,No,Healthy
+P034,45.0,Female,25.4,139,303,142,70,Never,High School,Yes,Patient
+P035,79.6,Male,18.8,149,272,163,106,Former,High School,Yes,Patient
+P036,42.8,Female,23.0,150,247,138,78,Current,Master,Yes,Patient
+P037,39.7,Male,16.5,130,198,70,71,Former,High School,Yes,Healthy
+P038,46.6,Female,22.6,150,206,99,77,Current,Bachelor,No,Healthy
+P039,77.3,Male,27.1,142,253,154,81,Current,High School,No,Patient
+P040,42.8,Male,33.7,133,238,118,100,Former,High School,Yes,Patient
+P041,59.0,Female,25.3,99,183,87,63,Never,Bachelor,No,Healthy
+P042,60.1,Female,26.1,134,228,130,82,Former,Bachelor,Yes,Patient
+P043,33.2,Male,27.3,120,157,74,61,Never,High School,No,Healthy
+P044,65.5,Male,18.2,172,222,143,64,Former,High School,Yes,Patient
+P045,47.4,Female,24.9,112,129,88,63,Former,Bachelor,No,Healthy
+P046,52.8,Female,30.1,148,227,138,80,Never,High School,Yes,Patient
+P047,45.8,Female,18.1,120,150,72,65,Former,High School,No,Healthy
+P048,55.4,Female,31.6,163,197,121,72,Former,PhD,Yes,Patient
+P049,61.4,Female,28.4,180,235,144,63,Current,Bachelor,Yes,Patient
+P050,52.9,Female,22.3,112,222,83,69,Never,Bachelor,No,Healthy
+P051,79.0,Male,29.5,138,258,165,62,Never,Bachelor,Yes,Patient
+P052,45.1,Male,36.1,161,183,122,89,Former,Bachelor,No,Patient
+P053,85.0,Female,27.7,155,200,134,81,Never,Bachelor,Yes,Patient
+P054,36.6,Female,28.0,173,258,149,63,Current,Bachelor,Yes,Patient
+P055,58.2,Male,25.2,154,201,102,76,Current,Master,No,Patient
+P056,67.1,Male,23.6,140,223,95,71,Never,High School,Yes,Patient
+P057,48.4,Female,27.3,129,197,70,74,Never,Bachelor,No,Healthy
+P058,37.5,Female,20.6,137,151,115,86,Never,Bachelor,No,Healthy
+P059,42.5,Male,24.3,132,183,79,50,Never,Master,No,Healthy
+P060,39.1,Male,22.1,128,140,141,71,Current,Bachelor,No,Healthy
+P061,37.9,Male,25.9,136,162,79,68,Former,Bachelor,Yes,Healthy
+P062,55.2,Male,25.3,138,190,94,78,Former,High School,No,Healthy
+P063,64.3,Male,31.2,166,182,161,83,Current,Bachelor,Yes,Patient
+P064,36.7,Male,22.0,130,193,130,61,Never,High School,No,Healthy
+P065,55.8,Female,22.9,117,179,131,66,Current,Bachelor,No,Healthy
+P066,63.7,Male,23.1,147,247,154,70,Former,High School,Yes,Patient
+P067,54.8,Female,22.2,138,187,110,83,Former,Bachelor,No,Healthy
+P068,67.6,Female,28.5,133,271,142,80,Current,High School,Yes,Patient
+P069,35.1,Male,27.0,126,184,106,93,Never,Bachelor,No,Healthy
+P070,53.3,Female,23.3,139,217,119,79,Current,Master,Yes,Patient
+P071,69.0,Male,30.5,145,234,114,71,Never,High School,Yes,Patient
+P072,52.3,Female,29.4,139,196,90,52,Never,Bachelor,Yes,Healthy
+P073,44.7,Male,25.7,123,181,87,50,Never,Bachelor,No,Healthy
+P074,61.4,Female,34.5,146,231,121,61,Current,High School,Yes,Patient
+P075,75.3,Female,23.9,125,209,144,83,Current,Master,Yes,Patient
+P076,52.9,Male,22.0,156,210,149,86,Current,High School,Yes,Patient
+P077,66.6,Male,19.9,155,188,132,61,Current,Bachelor,Yes,Patient
+P078,42.6,Female,30.0,152,232,120,81,Never,Bachelor,No,Healthy
+P079,42.4,Female,26.6,115,143,70,64,Current,Bachelor,No,Healthy
+P080,58.2,Male,23.8,123,159,86,72,Never,Bachelor,Yes,Healthy
+P081,69.9,Female,28.1,149,208,116,99,Former,High School,Yes,Patient
+P082,69.8,Male,22.5,169,257,93,91,Never,High School,Yes,Patient
+P083,60.7,Female,33.8,119,171,88,67,Former,Master,Yes,Healthy
+P084,45.3,Male,24.5,124,217,88,59,Former,Bachelor,Yes,Healthy
+P085,53.2,Female,24.4,129,160,120,50,Never,Master,Yes,Healthy
+P086,41.3,Male,26.9,123,188,103,61,Never,Master,No,Healthy
+P087,63.9,Male,28.9,138,205,110,77,Current,Master,Yes,Patient
+P088,58.4,Male,27.9,148,294,167,68,Never,Bachelor,Yes,Patient
+P089,61.2,Male,23.8,161,194,154,78,Current,Bachelor,Yes,Patient
+P090,67.1,Female,28.9,130,239,142,81,Current,Master,Yes,Patient
+P091,35.2,Male,31.5,122,199,85,67,Never,Bachelor,No,Healthy
+P092,85.0,Female,32.4,134,242,111,72,Never,High School,No,Patient
+P093,47.9,Male,33.4,163,224,123,82,Current,Master,Yes,Patient
+P094,45.4,Male,25.0,122,226,152,85,Current,Master,No,Patient
+P095,73.9,Male,23.0,137,231,168,67,Former,Bachelor,Yes,Patient
+P096,69.5,Male,26.5,151,226,161,97,Current,High School,Yes,Patient
+P097,67.5,Male,27.2,168,259,120,79,Never,Bachelor,Yes,Patient
+P098,67.5,Male,31.4,144,296,108,80,Former,Master,Yes,Patient
+P099,44.9,Male,17.2,112,163,93,78,Former,PhD,No,Healthy
+P100,34.2,Male,30.1,148,139,70,73,Former,High School,No,Healthy
+P101,45.9,Female,23.4,98,177,96,81,Never,High School,Yes,Healthy
+P102,51.9,Female,25.3,112,307,127,83,Current,Master,Yes,Patient
+P103,56.7,Male,20.0,127,156,81,63,Never,Bachelor,No,Healthy
+P104,58.2,Male,20.4,137,279,98,84,Former,Bachelor,Yes,Patient
+P105,50.1,Female,30.3,130,280,140,66,Never,PhD,Yes,Patient
+P106,41.1,Female,24.3,131,163,79,71,Former,High School,No,Healthy
+P107,65.0,Female,21.8,149,247,107,80,Never,Bachelor,Yes,Patient
+P108,53.2,Male,21.8,137,279,73,78,Former,High School,Yes,Patient
+P109,35.1,Female,22.7,101,169,89,68,Never,Bachelor,No,Healthy
+P110,47.9,Female,30.7,133,174,125,50,Former,Master,No,Healthy
+P111,47.9,Female,23.0,130,163,123,63,Former,Bachelor,No,Healthy
+P112,38.9,Female,18.0,119,150,81,71,Former,PhD,No,Healthy
+P113,54.3,Male,26.0,173,211,118,82,Never,Bachelor,Yes,Patient
+P114,62.8,Male,25.9,129,193,139,68,Former,Bachelor,Yes,Patient
+P115,42.6,Female,16.2,122,231,110,95,Former,High School,Yes,Patient
+P116,43.1,Female,26.8,135,207,136,70,Current,Bachelor,Yes,Patient
+P117,51.4,Male,26.1,144,237,145,92,Current,Bachelor,No,Patient
+P118,42.4,Male,26.8,124,133,115,75,Never,High School,No,Healthy
+P119,63.7,Male,34.4,141,240,128,72,Former,Bachelor,No,Patient
+P120,77.7,Male,31.5,150,255,126,101,Never,Bachelor,No,Patient
+P121,70.3,Female,25.9,126,170,112,66,Former,Master,Yes,Patient
+P122,58.1,Female,22.6,167,241,113,91,Never,Bachelor,Yes,Patient
+P123,44.8,Male,34.3,119,217,85,82,Never,Master,No,Healthy
+P124,33.0,Male,24.2,137,144,97,62,Never,High School,No,Healthy
+P125,44.8,Male,24.1,125,230,108,87,Former,High School,No,Healthy
+P126,56.5,Male,26.9,152,243,114,77,Former,Bachelor,Yes,Patient
+P127,63.9,Female,27.8,154,209,160,83,Current,Bachelor,Yes,Patient
+P128,50.1,Female,26.4,152,228,125,83,Former,High School,No,Patient
+P129,51.2,Female,21.7,130,197,90,68,Never,Master,No,Healthy
+P130,78.4,Male,24.8,165,232,115,90,Current,Master,Yes,Patient
+P131,58.7,Female,26.9,148,246,82,90,Never,Bachelor,Yes,Patient
+P132,49.8,Female,21.8,131,152,108,50,Never,High School,No,Healthy
+P133,53.3,Female,21.1,119,185,105,86,Former,Master,No,Healthy
+P134,40.2,Male,24.4,142,138,84,50,Never,Bachelor,Yes,Healthy
+P135,62.7,Male,26.0,135,227,131,92,Never,Master,Yes,Patient
+P136,45.2,Male,30.0,147,153,100,84,Never,Master,No,Healthy
+P137,61.2,Male,16.4,144,208,99,67,Current,Master,Yes,Patient
+P138,50.7,Male,31.4,124,267,119,75,Former,Bachelor,No,Patient
+P139,45.3,Male,29.0,122,213,106,57,Former,High School,No,Healthy
+P140,66.0,Male,18.7,135,248,105,77,Former,Bachelor,Yes,Patient
+P141,77.4,Female,25.6,158,197,136,76,Never,Bachelor,Yes,Patient
+P142,56.5,Male,22.5,110,171,70,79,Never,Master,No,Healthy
+P143,85.0,Male,21.4,138,266,139,96,Current,High School,Yes,Patient
+P144,35.8,Female,20.9,92,184,89,87,Never,High School,No,Healthy
+P145,55.5,Female,19.6,113,250,70,63,Never,Master,No,Healthy
+P146,47.2,Female,31.0,90,192,113,67,Never,Master,No,Healthy
+P147,85.0,Female,30.7,121,236,115,60,Former,PhD,No,Patient
+P148,50.3,Female,32.1,156,221,114,70,Current,Master,Yes,Patient
+P149,34.9,Female,26.9,132,184,94,82,Never,Bachelor,No,Healthy
+P150,37.8,Male,19.5,126,175,113,89,Never,Bachelor,No,Healthy
+P151,34.5,Male,24.9,130,251,110,65,Never,Master,Yes,Patient
+P152,38.7,Male,26.0,119,209,91,63,Current,Bachelor,Yes,Healthy
+P153,35.9,Male,19.1,120,156,99,70,Never,Bachelor,No,Healthy
+P154,61.8,Male,29.9,128,190,144,83,Former,High School,Yes,Patient
+P155,64.1,Female,26.0,168,175,134,70,Current,Bachelor,Yes,Patient
+P156,67.5,Female,22.5,133,195,83,75,Former,Master,No,Healthy
+P157,71.4,Female,29.8,142,197,113,74,Former,High School,Yes,Patient
+P158,53.1,Male,28.8,145,165,132,80,Former,High School,Yes,Patient
+P159,34.2,Female,22.6,123,192,70,77,Never,Bachelor,No,Healthy
+P160,65.9,Female,31.6,114,305,72,80,Never,High School,No,Patient
+P161,29.2,Male,19.7,116,180,99,65,Never,High School,No,Healthy
+P162,82.0,Female,29.5,135,255,148,79,Former,Bachelor,Yes,Patient
+P163,74.2,Male,29.4,130,232,83,79,Never,PhD,No,Patient
+P164,54.4,Male,25.8,141,227,110,76,Never,Bachelor,Yes,Patient
+P165,24.4,Female,25.3,147,208,102,67,Former,High School,No,Healthy
+P166,76.2,Male,22.0,155,221,171,99,Current,High School,Yes,Patient
+P167,43.6,Male,27.7,111,188,90,77,Former,Bachelor,No,Healthy
+P168,59.9,Female,23.3,129,190,75,66,Never,Bachelor,No,Healthy
+P169,25.9,Female,21.9,141,160,86,78,Never,Master,No,Healthy
+P170,52.8,Male,31.2,159,260,157,76,Current,Bachelor,No,Patient
+P171,60.1,Male,24.2,146,225,117,94,Never,Master,Yes,Patient
+P172,45.6,Male,18.4,110,157,74,74,Never,High School,No,Healthy
+P173,54.6,Female,20.8,155,246,120,79,Former,Bachelor,Yes,Patient
+P174,52.5,Male,26.4,126,153,71,75,Former,High School,No,Healthy
+P175,47.2,Male,21.9,158,231,132,61,Former,PhD,Yes,Patient
+P176,43.3,Female,31.0,130,180,122,56,Never,Bachelor,No,Healthy
+P177,61.4,Female,18.7,161,263,136,66,Never,Bachelor,No,Patient
+P178,51.2,Male,30.8,112,194,85,72,Current,High School,No,Healthy
+P179,68.5,Female,27.8,165,229,124,101,Never,High School,Yes,Patient
+P180,31.5,Female,23.6,123,205,70,97,Former,Bachelor,No,Healthy
+P181,26.6,Male,21.8,151,222,108,78,Former,High School,No,Healthy
+P182,60.3,Male,25.6,110,197,88,76,Former,Bachelor,No,Healthy
+P183,64.0,Female,26.8,171,230,126,58,Former,High School,Yes,Patient
+P184,51.0,Male,31.4,148,191,194,73,Never,Bachelor,Yes,Patient
+P185,63.6,Female,24.5,110,148,96,61,Never,Master,No,Healthy
+P186,61.4,Male,27.6,138,221,115,73,Current,Master,Yes,Patient
+P187,74.2,Male,25.5,140,212,121,78,Current,Master,Yes,Patient
+P188,60.8,Male,26.8,151,224,153,74,Never,High School,Yes,Patient
+P189,84.7,Male,28.2,153,232,132,56,Never,High School,No,Patient
+P190,66.1,Male,17.2,111,196,70,79,Current,Bachelor,No,Healthy
+P191,42.0,Male,18.6,120,178,108,57,Former,Bachelor,No,Healthy
+P192,71.7,Female,30.0,177,245,117,83,Current,Bachelor,Yes,Patient
+P193,67.7,Female,27.7,171,232,167,105,Never,High School,Yes,Patient
+P194,76.4,Female,26.3,152,171,152,69,Former,High School,Yes,Patient
+P195,33.4,Female,24.1,121,152,81,50,Former,High School,No,Healthy
+P196,53.2,Male,25.4,122,176,116,67,Former,Master,No,Healthy
+P197,72.7,Female,24.8,154,194,131,93,Former,High School,No,Patient
+P198,38.9,Male,23.9,130,248,147,104,Never,Bachelor,Yes,Patient
+P199,45.8,Female,27.8,141,276,140,65,Former,High School,Yes,Patient
+P200,35.5,Female,23.1,120,267,113,86,Never,Bachelor,Yes,Patient
+P201,56.8,Female,28.6,151,224,117,74,Former,Bachelor,No,Patient
+P202,53.6,Female,17.2,130,225,111,69,Current,Master,No,Healthy
+P203,63.0,Female,28.1,113,184,83,102,Never,Master,No,Healthy
+P204,60.9,Male,28.9,169,220,122,62,Current,Bachelor,Yes,Patient
+P205,79.5,Male,28.0,127,212,111,83,Never,PhD,Yes,Patient
+P206,28.4,Female,27.9,98,171,98,76,Former,PhD,No,Healthy
+P207,24.6,Male,30.7,123,168,131,83,Current,Master,Yes,Healthy
+P208,59.3,Female,31.1,161,235,109,81,Never,Master,Yes,Patient
+P209,49.6,Female,16.6,145,185,90,74,Never,High School,Yes,Healthy
+P210,44.6,Male,18.9,113,180,118,65,Never,Bachelor,No,Healthy
+P211,35.2,Female,24.5,161,243,128,83,Never,High School,Yes,Patient
+P212,58.9,Female,27.1,144,266,139,76,Current,High School,Yes,Patient
+P213,44.3,Female,29.1,142,258,109,87,Current,PhD,Yes,Patient
+P214,53.0,Female,21.1,133,135,99,66,Never,Bachelor,Yes,Healthy
+P215,64.4,Female,27.7,155,153,126,85,Never,Master,No,Patient
+P216,33.7,Female,21.0,96,208,110,70,Never,Master,Yes,Healthy
+P217,38.8,Female,21.6,142,139,114,84,Former,Master,No,Healthy
+P218,47.3,Male,21.4,166,223,182,79,Never,PhD,Yes,Patient
+P219,59.2,Male,23.3,136,195,142,59,Former,High School,Yes,Patient
+P220,71.5,Female,21.6,151,176,137,95,Former,High School,No,Patient
+P221,48.2,Male,23.1,152,246,134,69,Former,Bachelor,Yes,Patient
+P222,66.0,Female,31.2,149,253,123,72,Never,High School,Yes,Patient
+P223,38.6,Female,20.2,112,163,97,63,Former,High School,No,Healthy
+P224,35.5,Male,34.5,110,120,84,86,Never,Bachelor,No,Healthy
+P225,43.7,Female,26.0,120,164,93,50,Never,Master,Yes,Healthy
+P226,32.6,Female,24.7,138,192,116,108,Former,Bachelor,No,Healthy
+P227,53.4,Male,23.6,153,186,110,93,Current,Bachelor,Yes,Patient
+P228,30.6,Male,26.8,114,186,113,73,Never,Bachelor,No,Healthy
+P229,83.6,Male,24.7,157,230,156,79,Never,High School,Yes,Patient
+P230,60.4,Male,27.5,102,247,128,83,Never,High School,Yes,Patient
+P231,51.6,Female,37.2,162,234,88,86,Never,Master,Yes,Patient
+P232,62.6,Male,26.6,119,201,118,88,Never,Bachelor,No,Patient
+P233,58.7,Female,31.6,140,266,156,87,Never,Master,No,Patient
+P234,57.3,Male,24.2,128,225,130,81,Former,High School,Yes,Patient
+P235,52.4,Male,23.9,101,179,70,68,Former,Master,No,Healthy
+P236,69.1,Female,34.1,162,202,120,78,Former,Bachelor,No,Patient
+P237,38.6,Female,21.5,113,167,107,68,Former,Bachelor,No,Healthy
+P238,38.1,Male,31.2,125,153,101,84,Never,Bachelor,No,Healthy
+P239,56.7,Male,29.8,144,225,125,87,Current,Master,Yes,Patient
+P240,18.0,Male,21.8,127,231,83,50,Former,Bachelor,No,Healthy
+P241,41.8,Male,29.5,146,189,122,88,Current,Bachelor,Yes,Patient
+P242,76.4,Female,30.9,126,182,112,82,Current,PhD,No,Patient
+P243,79.7,Male,29.5,160,274,162,80,Current,Master,Yes,Patient
+P244,42.0,Male,17.7,113,174,84,65,Never,Bachelor,No,Healthy
+P245,51.9,Male,21.1,97,160,114,83,Never,Master,No,Healthy
+P246,63.7,Female,26.0,139,261,160,91,Former,Bachelor,Yes,Patient
+P247,85.0,Female,26.7,168,212,150,71,Current,High School,Yes,Patient
+P248,73.4,Male,29.5,158,285,121,85,Current,Bachelor,Yes,Patient
+P249,58.5,Female,27.7,140,250,138,68,Former,PhD,Yes,Patient
+P250,48.5,Male,21.7,140,215,130,63,Never,PhD,Yes,Patient
+P251,25.7,Male,25.5,115,245,72,62,Never,Bachelor,Yes,Healthy
+P252,47.4,Female,26.4,151,162,96,80,Current,Bachelor,Yes,Healthy
+P253,50.9,Female,29.2,151,252,106,91,Former,High School,Yes,Patient
+P254,27.9,Female,28.3,126,189,114,76,Never,PhD,No,Healthy
+P255,37.2,Female,27.3,135,219,81,79,Never,PhD,No,Healthy
+P256,47.0,Male,28.8,149,277,134,86,Former,Bachelor,Yes,Patient
+P257,80.2,Female,26.7,141,231,136,72,Current,Master,Yes,Patient
+P258,70.6,Male,20.4,142,207,125,85,Former,Master,Yes,Patient
+P259,59.9,Female,28.7,144,244,142,90,Current,Bachelor,Yes,Patient
+P260,62.8,Male,24.8,119,160,81,79,Never,High School,Yes,Healthy
+P261,60.9,Female,28.1,156,290,147,94,Former,Bachelor,No,Patient
+P262,49.7,Male,21.9,146,234,103,88,Never,Bachelor,No,Patient
+P263,63.3,Male,19.7,131,169,93,74,Former,Bachelor,No,Healthy
+P264,66.5,Female,31.2,144,236,169,93,Former,Bachelor,Yes,Patient
+P265,47.6,Male,26.8,146,190,110,80,Former,PhD,Yes,Patient
+P266,57.7,Female,29.7,115,201,116,69,Former,High School,Yes,Patient
+P267,49.5,Male,27.1,159,266,140,78,Current,Bachelor,Yes,Patient
+P268,43.4,Male,27.1,150,210,134,71,Never,Bachelor,Yes,Patient
+P269,56.1,Male,27.8,135,149,97,62,Former,Bachelor,No,Healthy
+P270,67.9,Male,21.9,90,196,100,68,Never,Bachelor,Yes,Healthy
+P271,43.2,Female,27.4,176,266,143,70,Former,High School,Yes,Patient
+P272,66.8,Male,25.2,143,252,152,76,Never,High School,Yes,Patient
+P273,52.2,Female,25.3,162,260,138,57,Former,Bachelor,Yes,Patient
+P274,54.2,Female,25.8,129,207,125,83,Former,Bachelor,Yes,Patient
+P275,52.9,Male,27.9,154,187,143,80,Never,High School,Yes,Patient
+P276,49.6,Female,25.1,129,275,168,70,Former,Master,Yes,Patient
+P277,60.6,Female,32.0,136,220,127,88,Current,Bachelor,Yes,Patient
+P278,50.0,Female,23.4,174,222,111,91,Never,Bachelor,Yes,Patient
+P279,63.2,Male,26.3,142,270,152,61,Current,Master,Yes,Patient
+P280,59.4,Male,25.2,148,247,128,71,Former,High School,Yes,Patient
+P281,57.1,Female,32.8,158,244,87,71,Former,High School,Yes,Patient
+P282,34.1,Female,24.8,127,245,107,59,Never,Master,Yes,Healthy
+P283,38.1,Female,28.1,122,161,79,80,Never,Bachelor,No,Healthy
+P284,54.1,Male,18.1,125,208,88,68,Never,Bachelor,No,Healthy
+P285,66.0,Female,28.1,180,232,137,77,Never,Master,Yes,Patient
+P286,33.3,Male,27.6,119,188,94,50,Never,Master,Yes,Healthy
+P287,61.2,Male,27.3,148,276,144,88,Former,PhD,No,Patient
+P288,69.0,Male,31.3,161,245,121,65,Current,Bachelor,Yes,Patient
+P289,25.0,Female,21.9,137,196,100,71,Former,Bachelor,No,Healthy
+P290,66.5,Male,32.6,163,262,125,83,Former,Bachelor,No,Patient
+P291,37.0,Male,33.2,130,169,105,86,Never,High School,No,Healthy
+P292,51.8,Female,22.5,103,155,102,54,Never,Bachelor,No,Healthy
+P293,50.8,Male,25.2,170,199,111,50,Former,High School,Yes,Patient
+P294,23.3,Male,29.8,103,121,112,72,Never,PhD,Yes,Healthy
+P295,25.5,Male,30.3,125,242,79,92,Never,Bachelor,Yes,Healthy
+P296,60.6,Female,24.9,134,197,146,95,Former,Bachelor,Yes,Patient
+P297,63.1,Female,25.3,144,223,137,83,Former,Bachelor,Yes,Patient
+P298,34.1,Male,22.9,125,172,127,64,Never,High School,No,Healthy
+P299,67.7,Female,21.6,150,239,126,90,Current,High School,Yes,Patient
+P300,25.1,Female,20.3,126,204,83,58,Former,Bachelor,Yes,Healthy

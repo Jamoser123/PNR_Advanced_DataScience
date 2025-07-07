@@ -780,7 +780,7 @@ def plot_distance_comparison(point_A, point_B):
 
     plt.show()
 
-def plot_projection(X, y, title, xlabel, ylabel, dataset_name="mnist", cmap=None, handles=None, legend_title=None):
+def plot_projection(X, y, title, xlabel, ylabel, dataset_name=None, cmap=None, handles=None, legend_title=None):
     """
     Plots a 2D projection of data points with optional coloring by label and custom legends.
     Args:
@@ -797,8 +797,23 @@ def plot_projection(X, y, title, xlabel, ylabel, dataset_name="mnist", cmap=None
         None: Displays the plot.
     """
 
+    # Handle categorical y values by converting to numerical
+    if y is not None:
+        if isinstance(y, (pd.Series, pd.DataFrame)):
+            unique_labels = y.unique()
+            y_numeric = pd.Categorical(y).codes
+        else:
+            unique_labels = np.unique(y)
+            if unique_labels.dtype.kind in 'OSU':  # Object, String, or Unicode
+                y_map = {val: i for i, val in enumerate(unique_labels)}
+                y_numeric = np.array([y_map[val] for val in y])
+            else:
+                y_numeric = y
+    else:
+        unique_labels = []
+        y_numeric = None
+
     # Define the Colormap based on the labels
-    unique_labels = np.unique(y)
     if cmap is None:
         if len(unique_labels) == 10:
             cmap = plt.get_cmap('tab10', len(unique_labels))
@@ -809,27 +824,35 @@ def plot_projection(X, y, title, xlabel, ylabel, dataset_name="mnist", cmap=None
     size = 3 if len(X) > 1000 else 30 
 
     # Define the legend handles for the used datasets
-    if dataset_name == "mnist":
-        handles = handles = [
+    if handles is None:
+        if dataset_name == "mnist":
+            handles = [
                 plt.Line2D([], [], marker="o", linestyle="", color=cmap(i), label=str(i))
                 for i in range(10)
-                ]
-        legend_title = "Digit"
-
-    elif dataset_name == "breast_cancer":
-        outcome_names = ['Malignant', 'Benign']
-        handles = [
-            plt.Line2D([], [], marker="o", linestyle="", color=cmap(i), label=outcome_name)
-            for i, outcome_name in enumerate(outcome_names)
-        ]
-        legend_title = "Outcome"
+            ]
+            legend_title = "Digit"
+        elif dataset_name == "breast_cancer":
+            outcome_names = ['Malignant', 'Benign']
+            handles = [
+                plt.Line2D([], [], marker="o", linestyle="", color=cmap(i), label=outcome_name)
+                for i, outcome_name in enumerate(outcome_names)
+            ]
+            legend_title = "Outcome"
+        elif y is not None and len(unique_labels) > 0:
+            # Create handles for categorical labels
+            handles = [
+                plt.Line2D([], [], marker="o", linestyle="", color=cmap(i), 
+                          label=str(label))
+                for i, label in enumerate(unique_labels)
+            ]
+            legend_title = legend_title or "Category"
 
     # Create the scatter plot
     plt.figure(figsize=(8, 6))
     if y is None:
         plt.scatter(X[:, 0], X[:, 1], s=size, alpha=0.5, cmap=cmap)
     else:
-        scatter = plt.scatter(X[:, 0], X[:, 1], c=y, s=size, cmap=cmap, alpha=0.5)
+        scatter = plt.scatter(X[:, 0], X[:, 1], c=y_numeric, s=size, cmap=cmap, alpha=0.5)
         if handles is not None:
             plt.legend(handles=handles, title=legend_title, bbox_to_anchor=(1.05, 1.0), loc='upper left')
     
