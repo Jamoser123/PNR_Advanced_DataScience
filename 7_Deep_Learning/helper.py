@@ -1,3 +1,4 @@
+import random
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -28,7 +29,7 @@ import gower
 from sklearn.datasets import make_blobs, make_classification, make_moons, make_circles
 
 from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN
-from sklearn.neighbors import NearestNeighbors
+from sklearn.neighbors import KNeighborsClassifier, NearestNeighbors
 from sklearn.metrics import silhouette_score, adjusted_rand_score, silhouette_samples
 from sklearn.linear_model import LinearRegression, Lasso, LogisticRegression, Ridge, ElasticNet
 from sklearn.preprocessing import StandardScaler
@@ -52,6 +53,8 @@ from torch import nn
 import torch.nn.functional as F
 
 import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset, Subset
+from medmnist import ChestMNIST
 
 
 def normalize(data):
@@ -4264,7 +4267,24 @@ def calculate_results_svm(X, y, svm_model, C_val):
 ### Deep Learning
 
 def interactive_relu_demo():
-    """Interactive demonstration of how ReLU combinations create different functions"""
+    """
+    Launches an interactive visualization for exploring combinations of three parameterized ReLU functions.
+    This function creates an interactive plot using sliders to adjust the weights and biases of three ReLU functions.
+    The individual ReLU functions and their combined output are displayed side by side, allowing users to intuitively
+    understand how different parameters affect the overall function.
+    The interactive interface includes sliders for:
+        - Weight and bias of ReLU 1
+        - Weight and bias of ReLU 2
+        - Weight and bias of ReLU 3
+    The left subplot shows the individual ReLU functions, and the right subplot shows their sum.
+    Note:
+        Requires `torch`, `matplotlib`, and `ipywidgets` to be installed and imported in the environment.
+    Example:
+        >>> interactive_relu_demo()
+        # Launches the interactive widget in a Jupyter notebook.
+    Returns:
+        None: This function is intended for interactive use and does not return a value.
+    """
     
     # Create x-axis
     x = torch.linspace(-2, 2, 1000)
@@ -4325,11 +4345,36 @@ def interactive_relu_demo():
              bias3=FloatSlider(min=-2, max=2, step=0.1, value=-0.5, description='Bias 3:', layout=bias_layout))
     
 def simple_sine_dataset(N=10):
+    """
+    Generates a simple sine wave dataset.
+
+    Args:
+        N (int, optional): Number of data points to generate. Defaults to 10.
+
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor]: 
+            - x_train: Input tensor of shape (N, 1) with values linearly spaced between 0 and 2π.
+            - y_train: Output tensor of shape (N, 1) with sine values corresponding to x_train.
+    """
     x_train = torch.linspace(0, 2*np.pi, N).view(-1, 1)
     y_train = torch.sin(x_train)    
     return x_train, y_train
 
 def approximate_function(x_train, y_train):
+    """
+    Approximates a piecewise linear function using a sum of ReLU activations.
+    Given training data points, constructs a function that interpolates the points
+    using a weighted sum of shifted ReLU functions. The weights are chosen such that
+    the resulting function matches the slopes between consecutive training points.
+    Args:
+        x_train (torch.Tensor): 1D tensor of x-coordinates of training points, shape (N,).
+        y_train (torch.Tensor): 1D tensor of y-coordinates of training points, shape (N,).
+    Returns:
+        y_hat (torch.Tensor): Approximated function values at dense x-axis, shape (1000,).
+        relu_acts (torch.Tensor): Matrix of ReLU activations, shape (N-1, 1000).
+        x (torch.Tensor): Dense x-axis used for plotting, shape (1000,).
+        combination_weights (torch.Tensor): Weights for each ReLU activation, shape (N-1,).
+    """
     
     # Number of ReLUs needed
     n_relus = x_train.shape[0] - 1
@@ -4363,6 +4408,23 @@ def approximate_function(x_train, y_train):
     return y_hat, relu_acts, x, combination_weights
 
 def plot_function_approximation(x_train, y_train, x, relu_acts, y_hat, combination_weights):
+    """
+    Visualizes the process of function approximation using a sum of ReLU activations compared to a target function.
+    This function creates a 2x2 grid of subplots to illustrate:
+      1. The target function (sin(x)) and training points.
+      2. The first three individual weighted ReLU components.
+      3. The cumulative sum of the first three weighted ReLU components, showing how the approximation is built.
+      4. The final approximation (sum of all weighted ReLU activations) compared to the target function.
+    Args:
+        x_train (torch.Tensor): Training input data, shape (n_train, 1) or (n_train,).
+        y_train (torch.Tensor): Training target values, shape (n_train, 1) or (n_train,).
+        x (torch.Tensor): Input values for plotting, shape (n_points, 1) or (n_points,).
+        relu_acts (torch.Tensor): ReLU activations for each unit, shape (n_relus, n_points).
+        y_hat (torch.Tensor): Final predicted output (sum of weighted ReLU activations), shape (n_points,).
+        combination_weights (torch.Tensor): Weights for combining ReLU activations, shape (n_relus,).
+    Returns:
+        None: Displays the generated plots.
+    """
     
     # Original function for comparison
     y_true = torch.sin(x)
@@ -4420,7 +4482,51 @@ def plot_function_approximation(x_train, y_train, x, relu_acts, y_hat, combinati
     plt.tight_layout()
     plt.show()
 
+def plot_function_fit(x_train, y_train, y_pred, losses):
+    """
+    Plots the true function, the predicted function, and prints the final loss.
+    Args:
+        x_train (array-like): Input values used for training.
+        y_train (array-like): True output values corresponding to x_train.
+        y_pred (array-like): Predicted output values from the model.
+        losses (list or array-like): List of loss values recorded during training.
+    Displays:
+        A matplotlib plot comparing the true function and the model's approximation.
+    Prints:
+        The final loss value from the training process.
+    """
+    # Compare results
+    plt.figure(figsize=(8, 6))
+    plt.plot(x_train, y_train, 'b-', linewidth=2, label='True sine')
+    plt.plot(x_train, y_pred, 'r--', linewidth=2, label='MLP approximation')
+    plt.title('MLP vs. True Function')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.show()
+
+    print(f"Final loss: {losses[-1]:.6f}")
+
 class SimpleMLP(nn.Module):
+    """
+    A simple Multi-Layer Perceptron (MLP) with configurable number of hidden layers and ReLU activations.
+    Attributes:
+        num_layers (int): Number of hidden layers in the network.
+        layers (nn.ModuleList): List of linear layers composing the MLP.
+        representations (dict): Stores intermediate representations for visualization.
+    Methods:
+        forward(x):
+            Performs a forward pass through the network, applying ReLU activations after each hidden layer.
+                x (torch.Tensor): Input tensor of shape (batch_size, input_size).
+            Returns:
+                torch.Tensor: Output tensor of shape (batch_size, output_size).
+        get_representations(x):
+            Computes and returns intermediate representations (input, hidden layers, output) for a given input.
+                x (torch.Tensor): Input tensor of shape (batch_size, input_size).
+            Returns:
+                dict: Dictionary mapping representation names ('input', 'hidden1', ..., 'output') to their numpy arrays.
+    """
     def __init__(self, input_size=1, hidden_size=20, output_size=1, num_layers=1):
         """
         Simple Neural Network with ReLU activation
@@ -4486,10 +4592,18 @@ class SimpleMLP(nn.Module):
             return representations
 
 def fit_model(model, x_train, y_train, epochs=2000, lr=0.01, type='regression'):
-    """Train the neural network - we'll explore this process in detail later!
-    
+    """
+    Trains a PyTorch model using the specified optimizer and loss function.
     Args:
-        type: 'classification' uses CrossEntropyLoss, 'regression' uses MSELoss
+        model (torch.nn.Module): The PyTorch model to be trained.
+        x_train (torch.Tensor): Input features for training.
+        y_train (torch.Tensor): Target values for training.
+        epochs (int, optional): Number of training epochs. Defaults to 2000.
+        lr (float, optional): Learning rate for the optimizer. Defaults to 0.01.
+        type (str, optional): Type of problem, either 'regression' or 'classification'. 
+            Determines the loss function. Defaults to 'regression'.
+    Returns:
+        list: List of loss values recorded at each epoch.
     """
     # Set random seed for reproducibility
     torch.manual_seed(42)
@@ -4517,7 +4631,17 @@ def fit_model(model, x_train, y_train, epochs=2000, lr=0.01, type='regression'):
     return losses
 
 def create_nested_circles_data(n_samples=1000, noise=0.1, random_state=42):
-    """Create nested circles dataset using sklearn"""
+    """
+    Generates a synthetic dataset of two nested circles for classification tasks and visualizes the data.
+    Args:
+        n_samples (int, optional): Total number of samples to generate. Defaults to 1000.
+        noise (float, optional): Standard deviation of Gaussian noise added to the data. Defaults to 0.1.
+        random_state (int, optional): Seed for random number generators to ensure reproducibility. Defaults to 42.
+    Returns:
+        Tuple[torch.FloatTensor, torch.LongTensor]: 
+            - X: Features as a FloatTensor of shape (n_samples, 2).
+            - y: Labels as a LongTensor of shape (n_samples,).
+    """
     torch.manual_seed(42)
     np.random.seed(42)
     X, y = make_circles(n_samples=n_samples, 
@@ -4543,7 +4667,17 @@ def create_nested_circles_data(n_samples=1000, noise=0.1, random_state=42):
     return torch.FloatTensor(X), torch.LongTensor(y)
 
 def visualize_decision_boundary(model, X, y):
-    """Visualize the decision boundary learned by the model"""
+    """
+    Visualizes the decision boundary of a classification model on 2D data.
+    This function creates a mesh grid over the feature space, uses the provided model to predict class probabilities
+    for each point in the grid, and plots the resulting decision boundary along with the original data points.
+    Args:
+        model (torch.nn.Module): Trained PyTorch model for classification. Should output logits for two classes.
+        X (np.ndarray): Input features of shape (n_samples, 2). Must be 2-dimensional for visualization.
+        y (np.ndarray): True class labels of shape (n_samples,). Should contain binary labels (0 and 1).
+    Returns:
+        None: Displays a matplotlib plot of the decision boundary and data points.
+    """
     # Create a mesh
     # Set random seed for reproducibility
     torch.manual_seed(42)
@@ -4584,7 +4718,21 @@ def visualize_decision_boundary(model, X, y):
     plt.show()
 
 def visualize_layer_transformations(model, X, y, n_samples=500):
-    """Visualize how data transforms through network layers using MDS"""
+    """
+    Visualizes how data representations change as they pass through the layers of a neural network.
+    This function samples a subset of the input data and obtains the representations from each layer
+    of the provided model. It then reduces the dimensionality of each layer's output to 2D using
+    Multidimensional Scaling (MDS) if necessary, and plots the transformed data for each class at
+    each layer, allowing for visual inspection of how the network separates the classes.
+    Args:
+        model: A neural network model with a `get_representations` method that returns a dictionary
+            of intermediate layer outputs for a given input batch.
+        X (np.ndarray or torch.Tensor): Input data of shape (n_samples, n_features).
+        y (np.ndarray or torch.Tensor): Target labels of shape (n_samples,).
+        n_samples (int, optional): Number of samples to randomly select for visualization. Defaults to 500.
+    Returns:
+        None: Displays a matplotlib figure showing the data transformations through the network layers.
+    """
     # Set random seed for reproducibility
     torch.manual_seed(42)
     np.random.seed(42)
@@ -4634,7 +4782,20 @@ def visualize_layer_transformations(model, X, y, n_samples=500):
     plt.show()
 
 def plot_multiple_epochs(X, y_true, epoch_params):
-    """Plot multiple epochs side by side"""
+    """
+    Plots the progression of a linear model's fit over multiple training epochs.
+    Args:
+        X (np.ndarray): Input feature array of shape (n_samples,).
+        y_true (np.ndarray): True target values of shape (n_samples,).
+        epoch_params (list of tuples): List containing tuples for each epoch, where each tuple is 
+            (epoch, weight, bias, loss). 
+            - epoch (int): The epoch number.
+            - weight (float): The model's weight (slope) at this epoch.
+            - bias (float): The model's bias (intercept) at this epoch.
+            - loss (float): The loss value at this epoch.
+    Returns:
+        None: Displays the plots using matplotlib.
+    """
     n_plots = len(epoch_params)
     fig, axes = plt.subplots(1, n_plots, figsize=(4 * n_plots, 5))
     
@@ -4659,7 +4820,18 @@ def plot_multiple_epochs(X, y_true, epoch_params):
     plt.show()
 
 def plot_single_epoch(X, y_true, epoch, weight, bias, loss):
-    """Plot the line fit for a single epoch"""
+    """
+    Plots the data points and the current linear model for a single training epoch.
+    Args:
+        X (np.ndarray): Input feature values.
+        y_true (np.ndarray): True target values corresponding to X.
+        epoch (int): The current epoch number.
+        weight (float): The current value of the model's weight (slope).
+        bias (float): The current value of the model's bias (intercept).
+        loss (float): The current loss value (not directly used in the plot).
+    Returns:
+        None: Displays the plot of the data and the model's prediction line.
+    """
     plt.figure(figsize=(6, 6))
     
     # Plot data and current line
@@ -4684,6 +4856,21 @@ def plot_single_epoch(X, y_true, epoch, weight, bias, loss):
 
 # Simple linear model
 class SimpleLinearRegression(nn.Module):
+    """
+    A simple linear regression model using PyTorch's nn.Module.
+    This model consists of a single linear layer with one input and one output feature.
+    The weights are initialized uniformly between -3 and -1, and the bias is initialized
+    uniformly between 5 and 6.
+    Attributes:
+        linear (nn.Linear): The linear layer performing the regression.
+    Methods:
+        forward(x):
+            Performs a forward pass of the input through the linear layer.
+    Args:
+        x (torch.Tensor): Input tensor of shape (batch_size, 1).
+    Returns:
+        torch.Tensor: Output tensor of shape (batch_size, 1) after applying the linear transformation.
+    """
     def __init__(self):
         super().__init__()
         self.linear = nn.Linear(1, 1)
@@ -4696,7 +4883,19 @@ class SimpleLinearRegression(nn.Module):
     
 def plot_decision_boundary_evolution(model, snapshots, epochs_to_show, X_data, y_data):
     """
-    Plot how decision boundary evolves during training
+    Plots the evolution of the decision boundary of a neural network model over specified training epochs.
+    This function visualizes how the decision boundary of a given model changes during training by plotting
+    the boundary at different epochs using saved model snapshots. It displays the decision boundary along with
+    the data points for each specified epoch.
+    Args:
+        model (torch.nn.Module): The neural network model whose decision boundary is to be visualized.
+        snapshots (dict): A dictionary containing model weights and loss values for each epoch.
+            Expected format: {epoch: {'weights': state_dict, 'loss': float}, ...}
+        epochs_to_show (list of int): List of epoch numbers at which to plot the decision boundary.
+        X_data (np.ndarray): Input data of shape (n_samples, 2), used for plotting.
+        y_data (np.ndarray): Ground truth labels of shape (n_samples,), used for coloring data points.
+    Returns:
+        None: This function displays the plots and does not return any value.
     """
     fig, axes = plt.subplots(1, len(epochs_to_show), figsize=(4*len(epochs_to_show), 4))
     
@@ -4766,6 +4965,70 @@ def plot_decision_boundary_evolution(model, snapshots, epochs_to_show, X_data, y
     plt.show()
 
 def plot_training_loss(losses, test_losses=None, epochs_to_show=None, title='Neural Network Training: Loss Decreases Over Time'):
+    """
+    Plots the training (and optionally test) loss over epochs, with outlier filtering and annotated epochs.
+    This function visualizes the progression of loss values during neural network training. It filters out extreme outliers
+    in the loss data using the IQR method to provide a more informative y-axis range. Optionally, it can plot test losses
+    and highlight specific epochs with vertical lines and labels.
+    Args:
+        losses (list or array-like): Sequence of training loss values (e.g., per epoch).
+        test_losses (list or array-like, optional): Sequence of test/validation loss values to plot for comparison. Defaults to None.
+        epochs_to_show (list of int, optional): List of epoch indices to highlight with vertical lines on the plot. Defaults to None.
+        title (str, optional): Title for the plot. Defaults to 'Neural Network Training: Loss Decreases Over Time'.
+    Returns:
+        None
+    Displays:
+        - A matplotlib plot showing training (and optionally test) loss over epochs.
+        - Annotated vertical lines at specified epochs.
+        - Prints initial, final, and percentage reduction in training loss.
+    """
+
+    # Combine all losses for outlier detection
+    all_losses = losses.copy()
+    if test_losses is not None:
+        all_losses.extend(test_losses)
+    
+    # Filter out extreme outliers using IQR method
+    def filter_outliers(data, factor=3.0):
+        """Remove extreme outliers using IQR method"""
+        if len(data) < 4:  # Need at least 4 points for quartiles
+            return data
+        
+        q1 = np.percentile(data, 25)
+        q3 = np.percentile(data, 75)
+        iqr = q3 - q1
+        
+        # Define outlier bounds (factor=3.0 is more lenient than typical 1.5)
+        lower_bound = q1 - factor * iqr
+        upper_bound = q3 + factor * iqr
+        
+        filtered_data = [x for x in data if lower_bound <= x <= upper_bound]
+        
+        # Ensure we keep at least 75% of the data
+        if len(filtered_data) < len(data) * 0.75:
+            # If too many points would be removed, use a more lenient approach
+            median = np.median(data)
+            mad = np.median([abs(x - median) for x in data])  # Median Absolute Deviation
+            threshold = median + 5 * mad  # Very lenient threshold
+            filtered_data = [x for x in data if x <= threshold]
+        
+        return filtered_data
+    
+    # Get filtered range for y-axis
+    filtered_losses = filter_outliers(all_losses)
+    
+    if len(filtered_losses) > 0:
+        min_loss = min(filtered_losses)
+        max_loss = max(filtered_losses)
+        
+        # Add padding (10% on each side)
+        y_range = max_loss - min_loss
+        y_padding = y_range * 0.1 if y_range > 0 else 0.1
+        y_min = max(0, min_loss - y_padding)  # Don't go below 0 for loss
+        y_max = max_loss + y_padding
+    else:
+        # Fallback if filtering fails
+        y_min, y_max = 0, max(all_losses) * 1.1
 
     # Plot the training loss
     plt.figure(figsize=(8, 6))
@@ -4777,6 +5040,10 @@ def plot_training_loss(losses, test_losses=None, epochs_to_show=None, title='Neu
     plt.title(title, fontsize=16, fontweight='bold')
     plt.grid(True, alpha=0.3)
     plt.legend(fontsize=12)
+
+    max_epochs = max(len(losses), len(test_losses) if test_losses else 0)
+    plt.xlim(0, max_epochs - 1)
+    plt.ylim(y_min, y_max)
 
     # Add vertical lines at the epochs we visualized
     if epochs_to_show is not None:
@@ -4797,8 +5064,19 @@ def plot_training_loss(losses, test_losses=None, epochs_to_show=None, title='Neu
 
 def compare_learning_rates(dataloader, learning_rates, total_epochs):
     """
-    Compare different learning rates by training a model for each rate
-    and storing the losses.
+    Compares the effect of different learning rates on model convergence by training a SimpleMLP model
+    with each specified learning rate and plotting the loss curves.
+    For each learning rate, the function:
+      - Initializes a new SimpleMLP model.
+      - Trains the model for the specified number of epochs using SGD optimizer.
+      - Records the average binary cross-entropy loss per epoch.
+      - Plots the loss curves for all learning rates for visual comparison.
+    Args:
+        dataloader (torch.utils.data.DataLoader): DataLoader providing batches of input data (batch_X) and labels (batch_y).
+        learning_rates (list of float): List of learning rates to compare.
+        total_epochs (int): Number of epochs to train each model.
+    Returns:
+        dict: A dictionary mapping each learning rate (float) to a list of average losses (float) per epoch.
     """
     # Dictionary to store losses for each learning rate
     all_losses = {}
@@ -4864,6 +5142,23 @@ def compare_learning_rates(dataloader, learning_rates, total_epochs):
     return all_losses
 
 def prepare_mnist(mnist, subset_size=10000):
+    """
+    Prepares a subset of the MNIST dataset for training and testing with convolutional neural networks (CNNs).
+    This function randomly selects a subset of the MNIST dataset, splits it into training and test sets,
+    reshapes the images for CNN input, normalizes pixel values, and converts the data to PyTorch tensors.
+    Args:
+        mnist: An object containing the MNIST dataset with attributes `data` (images) and `target` (labels).
+        subset_size (int, optional): Number of samples to use from the full dataset. Defaults to 10,000.
+    Returns:
+        Tuple[torch.FloatTensor, torch.LongTensor, torch.FloatTensor, torch.LongTensor]:
+            - X_train_tensor: Training images as a float tensor of shape (num_train, 1, 28, 28).
+            - y_train_tensor: Training labels as a long tensor of shape (num_train,).
+            - X_test_tensor: Test images as a float tensor of shape (num_test, 1, 28, 28).
+            - y_test_tensor: Test labels as a long tensor of shape (num_test,).
+    Prints:
+        - The number of samples in the subset, training set, and test set.
+        - The percentage reduction compared to the original dataset size.
+    """
     # Use a subset of MNIST for faster training
     X, y = mnist.data, mnist.target.astype(int)
 
@@ -4897,27 +5192,45 @@ def prepare_mnist(mnist, subset_size=10000):
     return X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor
 
 class SimpleCNN(nn.Module):
+    """
+    A configurable simple Convolutional Neural Network (CNN) for image classification tasks.
+    This class allows for flexible construction of a CNN with a variable number of convolutional
+    and fully connected layers. It also provides utilities for extracting intermediate representations
+    and feature maps for visualization and analysis.
+    Args:
+        input_channels (int): Number of input channels (e.g., 1 for grayscale, 3 for RGB). Default is 1.
+        num_conv_layers (int): Number of convolutional layers. Default is 2.
+        conv_channels (list of int): List specifying the number of output channels for each conv layer.
+            If fewer than `num_conv_layers` are provided, the last value is repeated. Default is [32, 64].
+        kernel_size (int): Size of the convolutional kernels. Default is 3.
+        padding (int): Padding added to all sides of the input for convolutional layers. Default is 1.
+        pool_size (int): Size of the max pooling window. Default is 2.
+        pool_stride (int): Stride of the max pooling window. Default is 2.
+        num_fc_layers (int): Number of fully connected (dense) layers before the output layer. Default is 2.
+        fc_hidden_size (int): Number of units in each hidden fully connected layer. Default is 128.
+        output_size (int): Number of output classes. Default is 10.
+        input_height (int): Height of the input images. Default is 28.
+        input_width (int): Width of the input images. Default is 28.
+    Attributes:
+        conv_layers (nn.ModuleList): List of convolutional layers.
+        pool_layers (nn.ModuleList): List of max pooling layers.
+        fc_layers (nn.ModuleList): List of fully connected layers.
+        representations (dict): Stores intermediate representations for each layer during forward pass.
+        conv_output_size (int): Size of the flattened output after all conv and pooling layers.
+    Methods:
+        forward(x):
+            Performs a forward pass through the network and stores intermediate representations.
+        get_representations(x):
+            Returns a dictionary of intermediate representations for a given input tensor.
+        get_feature_maps(x, layer_name):
+            Returns the feature maps from a specific convolutional or pooling layer.
+        summary():
+            Prints a summary of the network architecture, including layer details and output sizes.
+    """
     def __init__(self, input_channels=1, num_conv_layers=2, conv_channels=[32, 64], 
                  kernel_size=3, padding=1, pool_size=2, pool_stride=2,
                  num_fc_layers=2, fc_hidden_size=128, output_size=10, 
                  input_height=28, input_width=28):
-        """
-        Simple CNN with configurable architecture
-        
-        Args:
-            input_channels (int): Number of input channels (1 for grayscale, 3 for RGB)
-            num_conv_layers (int): Number of convolutional layers
-            conv_channels (list): Number of channels for each conv layer
-            kernel_size (int): Convolution kernel size
-            padding (int): Padding for convolutions
-            pool_size (int): Max pooling kernel size
-            pool_stride (int): Max pooling stride
-            num_fc_layers (int): Number of fully connected layers
-            fc_hidden_size (int): Hidden size for FC layers
-            output_size (int): Number of output classes
-            input_height (int): Height of input images
-            input_width (int): Width of input images
-        """
         super(SimpleCNN, self).__init__()
         
         self.num_conv_layers = num_conv_layers
@@ -5047,6 +5360,21 @@ class SimpleCNN(nn.Module):
             print(f"  FC{i+1}: {fc}")
 
 def extract_and_plot_feature_maps(model, sample_image, sample_label, category_name='Digit'):
+    """
+    Extracts feature maps from specified convolutional layers of a model for a given sample image,
+    and visualizes the original image alongside selected feature maps from each layer.
+    This function assumes the model provides a `get_feature_maps` method that returns the output
+    of a specified convolutional layer given an input image. It displays the original image,
+    the first five feature maps from the first convolutional layer, and the first five feature maps
+    from the second convolutional layer after pooling.
+    Args:
+        model (torch.nn.Module): The neural network model with a `get_feature_maps` method.
+        sample_image (torch.Tensor): The input image tensor of shape (1, C, H, W).
+        sample_label (int or str): The label or class name of the sample image.
+        category_name (str, optional): The category or dataset name for display purposes. Defaults to 'Digit'.
+    Returns:
+        None: This function displays plots and does not return any value.
+    """
 
     # Get feature maps using built-in method
     model.eval()
@@ -5097,6 +5425,25 @@ def extract_and_plot_feature_maps(model, sample_image, sample_label, category_na
     plt.show()
 
 def visualize_cnn_representations(model, X_test_tensor, y_test_tensor, num_samples=500):
+    """
+    Visualizes the internal representations of a CNN model at different layers using MDS.
+    This function extracts and visualizes the representations from three layers of a CNN model:
+    - Flattened convolutional features
+    - First fully connected (FC1) layer
+    - Second fully connected (FC2) layer (pre-softmax logits)
+    For each layer, the high-dimensional representations are standardized and projected to 2D using
+    Multidimensional Scaling (MDS). The resulting 2D embeddings are plotted in a three-panel figure,
+    colored by digit class.
+    Args:
+        model: The trained CNN model with a `get_representations` method that returns a dictionary
+            containing 'flattened', 'fc1', and 'fc2' representations for a batch of input data.
+        X_test_tensor (torch.Tensor): Test set input data as a tensor.
+        y_test_tensor (torch.Tensor): Test set labels as a tensor.
+        num_samples (int, optional): Number of test samples to use for visualization. Defaults to 500.
+    Returns:
+        None. Displays a matplotlib figure with three subplots visualizing the 2D embeddings of the
+        representations from each layer.
+    """
     # Use a subset of test data for visualization (500 samples for speed)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     n_samples = 500
@@ -5180,3 +5527,550 @@ def visualize_cnn_representations(model, X_test_tensor, y_test_tensor, num_sampl
 
     plt.tight_layout()
     plt.show()
+
+def get_sample(dataset, label_names=None):
+    """
+    Randomly selects a sample from the dataset and returns the image tensor (as a batch) and a title string.
+    Args:
+        dataset: A dataset object supporting indexing, where each item is a tuple (image_tensor, labels).
+        label_names (list of str, optional): List of label names corresponding to the indices in the labels tensor.
+            If provided, the function will generate a human-readable title based on active labels.
+    Returns:
+        tuple:
+            image_batch (torch.Tensor): The selected image tensor with an added batch dimension.
+            title (str): A string representing the active labels or the raw labels if label_names is not provided.
+    """
+    idx = random.randint(0, len(dataset) - 1)
+    
+    image_tensor, labels = dataset[idx]
+    image_batch = image_tensor.unsqueeze(0)
+        
+    if label_names is not None:
+        # Ensure label_names is a list of strings
+        active_conditions = [label_names[i] for i, val in enumerate(labels) if val == 1]
+        title = ', '.join(active_conditions) if active_conditions else 'Normal'
+    else:
+        title = str(labels)
+    
+    return image_batch, title
+
+def prepare_data_for_mlp(X, y, scale_target=True):
+    """
+    Prepares data for training a Multi-Layer Perceptron (MLP) by splitting, scaling, and converting to PyTorch tensors.
+    This function splits the input features and targets into training and testing sets, scales the features (and optionally the targets),
+    and converts the resulting arrays into PyTorch FloatTensors suitable for use in neural network models.
+    Args:
+        X (pd.DataFrame or np.ndarray): Feature matrix of shape (n_samples, n_features).
+        y (pd.Series or np.ndarray): Target vector of shape (n_samples,).
+        scale_target (bool, optional): Whether to scale the target variable using StandardScaler. Defaults to True.
+    Returns:
+        tuple: A tuple containing:
+            - X_train_tensor (torch.FloatTensor): Scaled training features tensor.
+            - y_train_tensor (torch.FloatTensor): Scaled training targets tensor.
+            - X_test_tensor (torch.FloatTensor): Scaled testing features tensor.
+            - y_test_tensor (torch.FloatTensor): Scaled testing targets tensor.
+    Raises:
+        ValueError: If the input shapes are incompatible or if required libraries are not imported.
+    Notes:
+        - Feature scaling is crucial for neural network training stability.
+        - Target scaling is recommended for regression tasks.
+        - The function prints information about the data split, scaling, and tensor shapes for debugging purposes.
+    """
+    # Split the data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+
+    print(f"Training set: {X_train.shape[0]} samples")
+    print(f"Test set: {X_test.shape[0]} samples")
+
+    # Scale the features (important for neural networks)
+    feature_scaler = StandardScaler()
+    X_train_scaled = feature_scaler.fit_transform(X_train)
+    X_test_scaled = feature_scaler.transform(X_test)
+
+    # Scale the targets too (crucial for regression)
+    if scale_target:
+        target_scaler = StandardScaler()
+        y_train_scaled = target_scaler.fit_transform(y_train.values.reshape(-1, 1)).flatten()
+        y_test_scaled = target_scaler.transform(y_test.values.reshape(-1, 1)).flatten()
+    else:
+        y_train_scaled = y_train.values
+        y_test_scaled = y_test.values
+
+    print(f"\nFeature scaling completed")
+    print(f"Training features mean: {X_train_scaled.mean():.3f}")
+    print(f"Training features std: {X_train_scaled.std():.3f}")
+
+    print(f"\nTarget scaling completed")
+    print(f"Original y_train range: [{y_train.min():.1f}, {y_train.max():.1f}]")
+    print(f"Scaled y_train range: [{y_train_scaled.min():.3f}, {y_train_scaled.max():.3f}]")
+
+    # Convert to PyTorch tensors
+    X_train_tensor = torch.FloatTensor(X_train_scaled)
+    X_test_tensor = torch.FloatTensor(X_test_scaled)
+    y_train_tensor = torch.FloatTensor(y_train_scaled).reshape(-1, 1)
+    y_test_tensor = torch.FloatTensor(y_test_scaled).reshape(-1, 1)
+
+    print(f"\nTensor shapes:")
+    print(f"X_train: {X_train_tensor.shape}")
+    print(f"y_train: {y_train_tensor.shape}")
+    print(f"X_test: {X_test_tensor.shape}")
+    print(f"y_test: {y_test_tensor.shape}")
+
+    return X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor
+
+def train_model(model, X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor, 
+                task_type='auto', criterion=None, learning_rate=0.001, batch_size=32, 
+                num_epochs=200, print_every=20):
+    """
+    Trains a PyTorch model for classification or regression tasks with automatic task type detection.
+    Args:
+        model (torch.nn.Module): The PyTorch model to train.
+        X_train_tensor (torch.Tensor): Training features tensor.
+        y_train_tensor (torch.Tensor): Training targets tensor.
+        X_test_tensor (torch.Tensor): Test features tensor.
+        y_test_tensor (torch.Tensor): Test targets tensor.
+        task_type (str, optional): Task type, one of {'auto', 'classification', 'multiclass', 'regression'}.
+            If 'auto', the function will infer the task type from the target tensor. Defaults to 'auto'.
+        criterion (torch.nn.Module, optional): Loss function. If None, selects appropriate loss based on task type.
+        learning_rate (float, optional): Learning rate for the optimizer. Defaults to 0.001.
+        batch_size (int, optional): Batch size for training. Defaults to 32.
+        num_epochs (int, optional): Number of training epochs. Defaults to 200.
+        print_every (int, optional): Print progress every `print_every` epochs. Defaults to 20.
+    Returns:
+        tuple: A tuple (train_losses, test_losses) where:
+            - train_losses (list of float): Training loss for each epoch.
+            - test_losses (list of float): Test loss for each epoch.
+    Raises:
+        ValueError: If a non-finite loss is encountered during training.
+    Notes:
+        - Supports binary classification, multi-class classification, and regression.
+        - Automatically moves data and model to GPU if available.
+        - Applies gradient clipping to prevent gradient explosion.
+        - Prints setup information and progress during training.
+    """
+    # Move to device
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+    
+    # Auto-detect task type
+    if task_type == 'auto':
+        unique_targets = torch.unique(y_train_tensor)
+        if len(unique_targets) == 2 and set(unique_targets.tolist()).issubset({0, 1, 0.0, 1.0}):
+            task_type = 'classification'
+        elif len(unique_targets) <= 10 and all(x == int(x) for x in unique_targets if x >= 0):
+            task_type = 'multiclass'
+        else:
+            task_type = 'regression'
+    
+    print(f"=== DETECTED TASK TYPE: {task_type.upper()} ===")
+    
+    # Prepare targets and loss function based on task type
+    if task_type == 'classification':
+        # Binary classification
+        y_train_tensor = y_train_tensor.float()
+        y_test_tensor = y_test_tensor.float()
+        
+        # Ensure binary values
+        y_train_tensor = torch.clamp(y_train_tensor, 0, 1)
+        y_test_tensor = torch.clamp(y_test_tensor, 0, 1)
+        
+        # Reshape if needed
+        if len(y_train_tensor.shape) == 1:
+            y_train_tensor = y_train_tensor.view(-1, 1)
+        if len(y_test_tensor.shape) == 1:
+            y_test_tensor = y_test_tensor.view(-1, 1)
+        
+        if criterion is None:
+            criterion = nn.BCEWithLogitsLoss()
+        
+        print(f"Binary classification setup:")
+        print(f"  Loss function: {criterion}")
+        print(f"  Target shape: {y_train_tensor.shape}")
+        print(f"  Target values: {torch.unique(y_train_tensor)}")
+        
+    elif task_type == 'multiclass':
+        # Multi-class classification
+        y_train_tensor = y_train_tensor.long()
+        y_test_tensor = y_test_tensor.long()
+        
+        if criterion is None:
+            criterion = nn.CrossEntropyLoss()
+        
+        num_classes = len(torch.unique(y_train_tensor))
+        print(f"Multi-class classification setup:")
+        print(f"  Loss function: {criterion}")
+        print(f"  Number of classes: {num_classes}")
+        print(f"  Target shape: {y_train_tensor.shape}")
+        
+    else:  # regression
+        # Regression
+        y_train_tensor = y_train_tensor.float()
+        y_test_tensor = y_test_tensor.float()
+        
+        # Reshape if needed
+        if len(y_train_tensor.shape) == 1:
+            y_train_tensor = y_train_tensor.view(-1, 1)
+        if len(y_test_tensor.shape) == 1:
+            y_test_tensor = y_test_tensor.view(-1, 1)
+        
+        if criterion is None:
+            criterion = nn.MSELoss()
+        
+        print(f"Regression setup:")
+        print(f"  Loss function: {criterion}")
+        print(f"  Target shape: {y_train_tensor.shape}")
+        print(f"  Target range: [{y_train_tensor.min().item():.4f}, {y_train_tensor.max().item():.4f}]")
+    
+    # Move data to device
+    X_train_tensor = X_train_tensor.to(device)
+    y_train_tensor = y_train_tensor.to(device)
+    X_test_tensor = X_test_tensor.to(device)
+    y_test_tensor = y_test_tensor.to(device)
+    
+    # Setup optimizer
+    optimizer = optim.SGD(model.parameters(), lr=learning_rate)
+    
+    # Create data loader
+    train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    
+    # Training setup
+    train_losses = []
+    test_losses = []
+    
+    print("")
+    print("Epoch | Train Loss | Test Loss  | LR")
+    print("-" * 45)
+    
+    # Training loop
+    for epoch in range(num_epochs):
+        # Training phase
+        model.train()
+        train_loss = 0.0
+        
+        for batch_X, batch_y in train_loader:
+            optimizer.zero_grad()
+            
+            # Forward pass
+            outputs = model(batch_X)
+            
+            # Calculate loss based on task type
+            if task_type == 'multiclass':
+                # CrossEntropyLoss expects class indices, not one-hot
+                loss = criterion(outputs, batch_y.squeeze())
+            else:
+                loss = criterion(outputs, batch_y)
+            
+            # Safety check for non-finite loss
+            if not torch.isfinite(loss):
+                print(f"\nERROR: Non-finite loss at epoch {epoch}")
+                print(f"Outputs range: [{outputs.min().item():.4f}, {outputs.max().item():.4f}]")
+                print(f"Targets range: [{batch_y.min().item():.4f}, {batch_y.max().item():.4f}]")
+                return train_losses, test_losses
+            
+            # Backward pass
+            loss.backward()
+            
+            # Gradient clipping to prevent explosion
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
+            optimizer.step()
+            train_loss += loss.item()
+        
+        train_loss /= len(train_loader)
+        
+        # Evaluation phase
+        model.eval()
+        with torch.no_grad():
+            test_outputs = model(X_test_tensor)
+            if task_type == 'multiclass':
+                test_loss = criterion(test_outputs, y_test_tensor.squeeze()).item()
+            else:
+                test_loss = criterion(test_outputs, y_test_tensor).item()
+        
+        train_losses.append(train_loss)
+        test_losses.append(test_loss)
+        
+        # Print progress
+        if (epoch + 1) % print_every == 0 or epoch == 0:
+            current_lr = optimizer.param_groups[0]['lr']
+            print(f"{epoch+1:5d} | {train_loss:10.4f} | {test_loss:9.4f} | {current_lr:.6f}")
+    
+    print("Training completed!")
+    return train_losses, test_losses
+
+def compare_regression_models(nn_model, lr_model, rf_model, gb_model, X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor):
+    """
+    Compare the performance of multiple regression models (Linear Regression, Random Forest, Gradient Boosting, and Neural Network)
+    on a given test set using Mean Squared Error (MSE) as the evaluation metric. Generates a bar plot of the MSE scores and prints
+    a summary table.
+    Args:
+        nn_model (torch.nn.Module): Trained PyTorch neural network model.
+        lr_model (sklearn.base.RegressorMixin): Untrained scikit-learn linear regression model.
+        rf_model (sklearn.base.RegressorMixin): Untrained scikit-learn random forest regressor.
+        gb_model (sklearn.base.RegressorMixin): Untrained scikit-learn gradient boosting regressor.
+        X_train_tensor (numpy.ndarray or torch.Tensor): Training feature data.
+        y_train_tensor (numpy.ndarray or torch.Tensor): Training target data.
+        X_test_tensor (numpy.ndarray or torch.Tensor): Test feature data.
+        y_test_tensor (numpy.ndarray or torch.Tensor): Test target data.
+    Returns:
+        None: This function displays a plot and prints results to the console.
+    """
+    # Ensure all models
+    # Linear Regression
+    lr_model.fit(X_train_tensor, y_train_tensor)
+    lr_pred = lr_model.predict(X_test_tensor)
+    lr_mse = mean_squared_error(y_test_tensor, lr_pred)
+
+    # Random Forest
+    rf_model.fit(X_train_tensor, y_train_tensor)
+    rf_pred = rf_model.predict(X_test_tensor)
+    rf_mse = mean_squared_error(y_test_tensor, rf_pred)
+
+    # Gradient Boosting
+    gb_model.fit(X_train_tensor, y_train_tensor)
+    gb_pred = gb_model.predict(X_test_tensor)
+    gb_mse = mean_squared_error(y_test_tensor, gb_pred)
+
+    # Neural Network (reuse trained model)
+
+    nn_model.eval()
+    with torch.no_grad():
+        nn_pred = nn_model(X_test_tensor).numpy().flatten()
+    nn_mse = mean_squared_error(y_test_tensor, nn_pred)
+
+    # Create comparison plot
+    methods = ['Linear Regression', 'Random Forest', 'Gradient Boosting', 'Neural Network']
+    mse_scores = [lr_mse, rf_mse, gb_mse, nn_mse]
+
+    plt.figure(figsize=(10, 6))
+    bars = plt.bar(methods, mse_scores, color=['skyblue', 'lightgreen', 'coral', 'gold'])
+    plt.ylabel('Mean Squared Error (MSE)')
+    plt.title('Model Comparison: Test Set Performance')
+    plt.xticks(rotation=45)
+
+    # Add value labels on bars
+    for bar, score in zip(bars, mse_scores):
+        plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.001,
+                f'{score:.4f}', ha='center', va='bottom')
+
+    plt.tight_layout()
+    plt.grid(True, alpha=0.3)
+    plt.show()
+
+    # Print detailed results
+    print("Model Performance Comparison (Test Set MSE):")
+    print("-" * 45)
+    for method, mse in zip(methods, mse_scores):
+        print(f"{method:<20}: {mse:.4f}")
+
+def compare_classification_models(nn_model, lr_model, knn_model, svm_model, 
+                                X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor):
+    """
+    Compare the performance of different classification models (Neural Network, Logistic Regression, K-Nearest Neighbors, and Support Vector Machine) on a given dataset.
+    This function trains and evaluates the provided models (or creates default ones if None are given) using the provided training and test data. It computes accuracy and log loss for each model, visualizes the results in bar plots, and prints a summary table.
+    Args:
+        nn_model (torch.nn.Module): Trained PyTorch neural network model.
+        lr_model (sklearn.base.BaseEstimator or None): Logistic Regression model. If None, a default LogisticRegression is used.
+        knn_model (sklearn.base.BaseEstimator or None): K-Nearest Neighbors model. If None, a default KNeighborsClassifier is used.
+        svm_model (sklearn.base.BaseEstimator or None): Support Vector Machine model. If None, a default SVC is used.
+        X_train_tensor (torch.Tensor): Training features as a PyTorch tensor.
+        y_train_tensor (torch.Tensor): Training labels as a PyTorch tensor.
+        X_test_tensor (torch.Tensor): Test features as a PyTorch tensor.
+        y_test_tensor (torch.Tensor): Test labels as a PyTorch tensor.
+    Returns:
+        None: This function displays plots and prints results but does not return any value.
+    Raises:
+        ValueError: If input tensors are not compatible with the models.
+        AttributeError: If the provided models do not implement required methods.
+    Example:
+        compare_classification_models(
+            nn_model, None, None, None,
+            X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor
+        )
+    """
+    # Convert tensors to numpy arrays for sklearn models
+    X_train_np = X_train_tensor.detach().cpu().numpy()
+    y_train_np = y_train_tensor.detach().cpu().numpy().flatten()
+    X_test_np = X_test_tensor.detach().cpu().numpy()
+    y_test_np = y_test_tensor.detach().cpu().numpy().flatten()
+    
+    # Create default models if None provided
+    if lr_model is None:
+        lr_model = LogisticRegression(random_state=42, max_iter=1000)
+    if knn_model is None:
+        knn_model = KNeighborsClassifier(n_neighbors=5)
+    if svm_model is None:
+        svm_model = SVC(probability=True, random_state=42)
+    
+    # Logistic Regression
+    lr_model.fit(X_train_np, y_train_np)
+    lr_pred = lr_model.predict(X_test_np)
+    lr_pred_proba = lr_model.predict_proba(X_test_np)[:, 1]
+    lr_accuracy = accuracy_score(y_test_np, lr_pred)
+    lr_logloss = log_loss(y_test_np, lr_pred_proba)
+
+    # K-Nearest Neighbors
+    knn_model.fit(X_train_np, y_train_np)
+    knn_pred = knn_model.predict(X_test_np)
+    knn_pred_proba = knn_model.predict_proba(X_test_np)[:, 1]
+    knn_accuracy = accuracy_score(y_test_np, knn_pred)
+    knn_logloss = log_loss(y_test_np, knn_pred_proba)
+
+    # Support Vector Machine
+    svm_model.fit(X_train_np, y_train_np)
+    svm_pred = svm_model.predict(X_test_np)
+    svm_pred_proba = svm_model.predict_proba(X_test_np)[:, 1]
+    svm_accuracy = accuracy_score(y_test_np, svm_pred)
+    svm_logloss = log_loss(y_test_np, svm_pred_proba)
+
+    # Neural Network
+    nn_model.eval()
+    device = next(nn_model.parameters()).device
+    X_test_tensor = X_test_tensor.to(device)
+    
+    with torch.no_grad():
+        nn_outputs = nn_model(X_test_tensor)
+        nn_pred_proba = torch.sigmoid(nn_outputs).cpu().numpy().flatten()
+        nn_pred = (nn_pred_proba > 0.5).astype(int)
+    
+    nn_accuracy = accuracy_score(y_test_np, nn_pred)
+    nn_logloss = log_loss(y_test_np, nn_pred_proba)
+
+    # Create comparison plots
+    methods = ['Logistic Regression', 'K-NN (k=5)', 'SVM', 'Neural Network']
+    accuracies = [lr_accuracy, knn_accuracy, svm_accuracy, nn_accuracy]
+    log_losses = [lr_logloss, knn_logloss, svm_logloss, nn_logloss]
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+
+    # Accuracy comparison
+    bars1 = ax1.bar(methods, accuracies, color=['skyblue', 'lightgreen', 'coral', 'gold'])
+    ax1.set_ylabel('Accuracy')
+    ax1.set_title('Model Comparison: Test Set Accuracy')
+    for bar, score in zip(bars1, accuracies):
+        ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.002,
+                f'{score:.3f}', ha='center', va='bottom')
+
+    # Log Loss comparison
+    bars2 = ax2.bar(methods, log_losses, color=['skyblue', 'lightgreen', 'coral', 'gold'])
+    ax2.set_ylabel('Log Loss (lower is better)')
+    ax2.set_title('Model Comparison: Test Set Log Loss')
+    for bar, score in zip(bars2, log_losses):
+        ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.005,
+                f'{score:.3f}', ha='center', va='bottom')
+
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+    # Print results
+    print("Model Performance Comparison:")
+    print("-" * 60)
+    print(f"{'Method':<20} {'Accuracy':<10} {'Log Loss':<10}")
+    print("-" * 60)
+    for method, acc, ll in zip(methods, accuracies, log_losses):
+        print(f"{method:<20} {acc:<10.3f} {ll:<10.3f}")
+
+    print(f"\nBest accuracy: {methods[np.argmax(accuracies)]}")
+    print(f"Best log loss: {methods[np.argmin(log_losses)]}")
+
+def loadChestMNIST(train_subset_size=800, test_subset_size=200, transform=None):
+    """
+    Loads the ChestMNIST dataset, creates random subsets for training and testing, and displays sample images.
+    Args:
+        train_subset_size (int, optional): Number of images to include in the training subset. Defaults to 800.
+        test_subset_size (int, optional): Number of images to include in the test subset. Defaults to 200.
+        transform (callable, optional): Optional transform to be applied on a sample. If None, defaults to converting images to tensors.
+    Returns:
+        tuple: 
+            - train_subset (torch.utils.data.Subset): Subset of the training dataset.
+            - test_subset (torch.utils.data.Subset): Subset of the test dataset.
+            - label_names (dict): Dictionary mapping label indices to label names.
+    Displays:
+        A matplotlib figure showing 10 sample images from the training subset with their corresponding labels.
+    """
+    # Load ChestMNIST dataset
+    print("Loading ChestMNIST dataset...")
+    # Add transforms to convert PIL images to tensors
+    from torchvision import transforms
+    if transform is None:
+        transform = transforms.Compose([transforms.ToTensor()])
+    
+    train_dataset = ChestMNIST(split='train', download=True, transform=transform)
+    test_dataset = ChestMNIST(split='test', download=True, transform=transform)
+
+    print(f"Full dataset sizes:")
+    print(f"Training: {len(train_dataset)} images")
+    print(f"Test: {len(test_dataset)} images")
+
+    # Create subset of 8'000 training images
+    train_subset_indices = random.sample(range(len(train_dataset)), train_subset_size)
+    train_subset = Subset(train_dataset, train_subset_indices)
+
+    # Create subset of 2'000 test images
+    test_subset_indices = random.sample(range(len(test_dataset)), test_subset_size)
+    test_subset = Subset(test_dataset, test_subset_indices)
+
+    print(f"\nUsing subset of {len(train_subset)} training images")
+    print(f"Test set: {len(test_subset)} images")
+
+    # Get label names from the dataset
+    label_names = {
+        0: "atelectasis", 
+        1: "cardiomegaly", 
+        2: "effusion", 
+        3: "infiltration", 
+        4: "mass", 
+        5: "nodule", 
+        6: "pneumonia", 
+        7: "pneumothorax", 
+        8: "consolidation", 
+        9: "edema", 
+        10: "emphysema", 
+        11: "fibrosis", 
+        12: "pleural", 
+        13: "hernia"
+    }
+
+    # Display sample images
+    fig, axes = plt.subplots(2, 5, figsize=(15, 6))
+    axes = axes.ravel()
+
+    for i in range(10):
+        # Get random sample from subset
+        idx = train_subset_indices[i]
+        image, label = train_dataset[idx]
+        
+        # Handle different image formats
+        if isinstance(image, torch.Tensor):
+            if image.shape[0] == 3:  # RGB tensor (3, H, W)
+                # Convert from (C, H, W) to (H, W, C) for matplotlib
+                image_np = image.permute(1, 2, 0).numpy()
+                # Denormalize if needed (assuming ImageNet normalization)
+                if image_np.min() < 0:  # Likely normalized
+                    mean = np.array([0.485, 0.456, 0.406])
+                    std = np.array([0.229, 0.224, 0.225])
+                    image_np = image_np * std + mean
+                    image_np = np.clip(image_np, 0, 1)
+                axes[i].imshow(image_np)
+            else:  # Grayscale tensor (1, H, W) or (H, W)
+                image_np = image.squeeze().numpy()
+                axes[i].imshow(image_np, cmap='gray')
+        else:
+            # Handle PIL Image case
+            axes[i].imshow(image, cmap='gray')
+        
+        # Convert multi-label to readable format
+        active_labels = [label_names[j] for j, val in enumerate(label) if val == 1]
+        title = ', '.join(active_labels) if active_labels else 'Normal'
+        axes[i].set_title(title, fontsize=8)
+        axes[i].axis('off')
+
+    plt.suptitle('Sample Chest X-ray Images from ChestMNIST', fontsize=14)
+    plt.tight_layout()
+    plt.show()
+
+    return train_subset, test_subset, label_names
