@@ -7,14 +7,17 @@ from sklearn import cluster
 
 from IPython.display import display, HTML
 
-from sklearn.metrics import accuracy_score, r2_score
+from sklearn.calibration import cross_val_predict
+from sklearn.manifold import MDS
+from sklearn.metrics import ConfusionMatrixDisplay, accuracy_score, auc, confusion_matrix, f1_score, make_scorer, precision_score, r2_score, recall_score, roc_curve
 from sklearn.decomposition import PCA
 from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor, RandomForestClassifier, RandomForestRegressor
 from sklearn.inspection import PartialDependenceDisplay
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_validate, train_test_split
 from sklearn.metrics import log_loss, mean_squared_error
 
 from sklearn.pipeline import Pipeline
+from sklearn.svm import SVC
 import statsmodels.formula.api as smf
 
 import seaborn as sns
@@ -22,7 +25,7 @@ from matplotlib import cm
 
 from sklearn.metrics import pairwise_distances
 import gower
-from sklearn.datasets import make_blobs, make_moons, make_circles
+from sklearn.datasets import make_blobs, make_classification, make_moons, make_circles
 
 from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN
 from sklearn.neighbors import NearestNeighbors
@@ -39,6 +42,17 @@ import matplotlib.lines as mlines
 
 from sklearn.model_selection import cross_val_score
 import numpy as np
+
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
+from ipywidgets import interact, FloatSlider, Layout
+import ipywidgets as widgets
+from torch import nn
+import torch.nn.functional as F
+
+import torch.optim as optim
+
 
 def normalize(data):
     """
@@ -279,23 +293,14 @@ def plot_rmse_loss_surface_with_arrow(X_norm, y, training_params, w0_range_offse
     """
     Plots the RMSE loss surface for a linear regression model with respect to its parameters (intercept and slope),
     overlaying the gradient descent optimization path and the closed-form solution.
-    Args:
-        X_norm (np.ndarray): Normalized input feature array.
-        y (np.ndarray): Target variable array.
-        training_params (tuple): Tuple containing (w0_hist, w1_hist, rmse_hist), which are the histories of the intercept,
-            slope, and RMSE values during training (e.g., from gradient descent).
-        w0_range_offset (float, optional): Range offset for the intercept axis around the closed-form optimum. Default is 70.
-        w1_range_offset (float, optional): Range offset for the slope axis around the closed-form optimum. Default is 70.
-        grid_points (int, optional): Number of points in the grid for each parameter axis. Default is 100.
-    Displays:
-        - A 3D surface plot of the RMSE loss landscape.
-        - The closed-form solution as a reference point.
-        - The optimization path if provided.
-        - A contour plot of the RMSE loss surface.
     """
     
     # Unpack training parameters
     w0_hist, w1_hist, rmse_hist = training_params
+    
+    # Ensure X_norm is 1D for this function
+    if X_norm.ndim > 1:
+        X_norm = X_norm.flatten()  # Convert to 1D
     
     # Closed-form solution for reference
     X_design = np.vstack([np.ones_like(X_norm), X_norm]).T
@@ -324,7 +329,7 @@ def plot_rmse_loss_surface_with_arrow(X_norm, y, training_params, w0_range_offse
     ax.set_xlabel('Intercept (w0)')
     ax.set_ylabel('Slope (w1)')
     ax.set_zlabel('RMSE Loss')
-    ax.set_title('RMSE Loss Surface for Therapy Intensity')
+    ax.set_title('RMSE Loss Surface for Linear Regression')
 
     ax.scatter(opt_w0, opt_w1, np.sqrt(np.mean((y - (opt_w0 + opt_w1 * X_norm))**2)), 
                color='orange', s=150, label='Closed-form Optimum')
@@ -339,7 +344,7 @@ def plot_rmse_loss_surface_with_arrow(X_norm, y, training_params, w0_range_offse
     cp = plt.contourf(W0, W1, rmse_surface, levels=30, cmap='viridis')
     plt.xlabel('Intercept (w0)')
     plt.ylabel('Slope (w1)')
-    plt.title('RMSE Loss Contour (Therapy Intensity)')
+    plt.title('RMSE Loss Contour for Linear Regression')
     plt.colorbar(cp, label='RMSE')
     plt.scatter([opt_w0], [opt_w1], c='orange', label='Closed-form Optimum')
 
@@ -1496,6 +1501,46 @@ def plot_hierarchical_clustering(X, linkage_matrix, cluster_labels, title):
     plt.tight_layout()
     plt.suptitle(title, fontsize=16, fontweight='bold', y=1.02)
     plt.show()
+
+def generate_moons_data(n_samples=300, noise=0.2, random_state=42, plot=True):
+    """
+    Generate a synthetic dataset of two interleaving half circles (moons).
+    
+    Parameters:
+    - n_samples: Number of samples to generate.
+    - noise: Standard deviation of Gaussian noise added to the data.
+    - random_state: Seed for reproducibility.
+    
+    Returns:
+    - X: Feature matrix of shape (n_samples, 2).
+    - y: Labels of shape (n_samples,).
+    """
+    # Create the moons dataset
+    X_moons, y_moons = make_moons(n_samples=300, noise=0.2, random_state=42)
+
+    if plot:
+        # Plot the moons data
+        plt.figure(figsize=(8, 6))
+        colors = ['red', 'blue']
+        labels = ['Class 0', 'Class 1']
+
+        for i in range(2):
+            mask = y_moons == i
+            plt.scatter(X_moons[mask, 0], X_moons[mask, 1], 
+                    c=colors[i], alpha=0.7, s=50, label=labels[i])
+
+        plt.xlabel('X₁', fontsize=14)
+        plt.ylabel('X₂', fontsize=14)
+        plt.title('Moons Dataset: A Non-Linear Classification Problem', fontsize=16, fontweight='bold')
+        plt.legend(fontsize=12)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+
+        print(f"Dataset shape: {X_moons.shape}")
+        print(f"Class distribution: {np.bincount(y_moons)}")
+
+    return X_moons, y_moons
 
 def generate_non_spherical_data():
     """
@@ -3580,6 +3625,1558 @@ def gb_hyperparam_analysis(X_train, y_train, X_test, y_test):
     plt.title('Tree Depth vs Accuracy')
     plt.ylim(0.55, 0.75)
     plt.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
+
+### Classification
+
+def generate_simple_classification_data(separable=False, scale=True, plot=True):
+    """
+    Generates a simple 2D synthetic classification dataset for visualization and experimentation.
+    The function creates a dataset with two features and two classes, with options to control class separability,
+    feature scaling, and plotting. Useful for demonstrating classification algorithms and visualizations.
+    Args:
+        separable (bool, optional): If True, generates well-separated classes with no label noise.
+            If False, generates classes with lower separation and some label noise. Defaults to False.
+        scale (bool, optional): If True, standardizes features using StandardScaler. Defaults to True.
+        plot (bool, optional): If True, plots the generated dataset using matplotlib. Defaults to True.
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: 
+            - X (np.ndarray): Feature matrix of shape (n_samples, 2).
+            - y (np.ndarray): Target labels of shape (n_samples,).
+    """
+    # Set random seed for reproducibility
+    np.random.seed(42)
+
+    if separable:
+        # For separable classes, increase class separation and reduce noise
+        class_sep = 4
+        flip_y = 0
+    else:
+        # For non-separable classes, use lower class separation and add some noise
+        class_sep = 0.8
+        flip_y = 0.05
+
+    # Generate a 2D classification dataset
+    X, y = make_classification(
+        n_samples=300,           # Total number of samples
+        n_features=2,            # Two features for easy visualization
+        n_redundant=0,           # No redundant features
+        n_informative=2,         # Both features are informative
+        n_clusters_per_class=1,  # One cluster per class
+        class_sep=class_sep,     # Separation between classes
+        flip_y=flip_y,           # Add 5% label noise
+        random_state=42
+    )
+
+    # Standardize features for better visualization and algorithm performance
+    if scale:
+        scaler = StandardScaler()
+        X = scaler.fit_transform(X)
+
+    # Visualize the standardized dataset
+    if plot:
+        plt.figure(figsize=(8, 6))
+        colors = ['red', 'blue']
+        for class_val in [0, 1]:
+            mask = y == class_val
+            plt.scatter(X[mask, 0], X[mask, 1], c=colors[class_val], 
+                        label=f'Class {class_val}', alpha=0.7, s=50)
+
+        plt.xlabel('Feature 1')
+        plt.ylabel('Feature 2')
+        plt.title('2D Classification Dataset')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.show()
+    
+    return X, y
+
+def evaluateModel(X, y, model, model_name='Logistic Regression', ax=None):
+    """
+    Evaluates a classification model using 5-fold cross-validation and visualizes the results.
+    Performs cross-validation on the provided model using the given features and labels,
+    computes accuracy, precision, recall, and F1-score, and displays a bar plot with error bars
+    representing the mean and standard deviation of each metric.
+    Args:
+        X (array-like or pd.DataFrame): Feature matrix for model evaluation.
+        y (array-like or pd.Series): Target labels corresponding to X.
+        model (estimator object): Scikit-learn compatible classification model to evaluate.
+        model_name (str, optional): Name of the model for plot title. Defaults to 'Logistic Regression'.
+        ax (matplotlib.axes.Axes, optional): Matplotlib axis to plot on. If None, a new figure and axis are created.
+    Returns:
+        None: This function displays a plot and does not return any value.
+    """
+    # Define scoring metrics for cross-validation
+    scoring = {
+        'accuracy': 'accuracy',
+        'precision': make_scorer(precision_score),
+        'recall': make_scorer(recall_score),
+        'f1': make_scorer(f1_score)
+    }
+
+    # Perform 5-fold cross-validation with multiple metrics
+    cv_results = cross_validate(model, X, y, cv=5, scoring=scoring)
+
+    # Calculate means and standard deviations
+    metrics_summary = {}
+    for metric in ['accuracy', 'precision', 'recall', 'f1']:
+        scores = cv_results[f'test_{metric}']
+        metrics_summary[metric] = {
+            'mean': scores.mean(),
+            'std': scores.std(),
+            'scores': scores
+        }
+
+    # Display results
+    #print("CLASSIFICATION METRICS SUMMARY (5-Fold Cross-Validation)")
+    #print("=" * 60)
+    #for metric, results in metrics_summary.items():
+    #    print(f"{metric.capitalize():10}: {results['mean']:.3f} (±{results['std']:.3f})")
+
+    # Visualize metrics with error bars
+    metrics_names = [metric.capitalize() for metric in metrics_summary.keys()]
+    means = [results['mean'] for results in metrics_summary.values()]
+    stds = [results['std'] for results in metrics_summary.values()]
+
+    # Create figure/axis if not provided
+    if ax is None:
+        plt.figure(figsize=(6, 4))
+        ax = plt.gca()
+
+    bars = ax.bar(metrics_names, means, yerr=stds, 
+                color=['skyblue', 'lightgreen', 'lightcoral', 'gold'], 
+                alpha=0.8, capsize=10, error_kw={'elinewidth': 2})
+
+    # Add value labels on bars
+    for bar, mean, std in zip(bars, means, stds):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + std + 0.01, 
+                f'{mean:.3f}±{std:.3f}', ha='center', va='bottom', fontweight='bold')
+
+    ax.set_ylabel('Score')
+    ax.set_title(f'Classification Metrics - {model_name} (5-Fold Cross-Validation)')
+    ax.set_ylim(0, 1.1)
+    ax.grid(True, alpha=0.3, axis='y')
+    
+    # Only show if we created our own figure
+    if ax == plt.gca():
+        plt.tight_layout()
+        plt.show()
+
+def evaluate_roc(X, y, model=None, model_name=None, models=None, model_names=None, ax=None):
+    """
+    Plots ROC curves and evaluates ROC-AUC performance for one or multiple classification models using cross-validation.
+    This function computes ROC curves and AUC scores for the provided model(s) using cross-validation,
+    plots the ROC curves, and prints summary statistics. It supports both single and multiple models.
+    If no matplotlib axis is provided, a new figure is created.
+    Args:
+        X (array-like or pd.DataFrame): Feature matrix of shape (n_samples, n_features).
+        y (array-like or pd.Series): Target vector of shape (n_samples,).
+        model (sklearn.base.BaseEstimator, optional): A single fitted classification model.
+        model_name (str, optional): Name for the single model (used in plot legend and reporting).
+        models (list of sklearn.base.BaseEstimator, optional): List of fitted classification models.
+        model_names (list of str, optional): List of names for the models.
+        ax (matplotlib.axes.Axes, optional): Matplotlib axis to plot on. If None, a new figure is created.
+    Raises:
+        ValueError: If neither `model` nor `models` is provided.
+        ValueError: If the length of `models` and `model_names` does not match.
+    Prints:
+        ROC-AUC performance summary for each model, including mean and standard deviation of cross-validated AUC,
+        and the ROC AUC computed from the ROC curve.
+    Returns:
+        None: The function displays the ROC plot and prints results, but does not return any value.
+    """
+    
+    # Handle single model vs multiple models
+    if models is None:
+        if model is None:
+            raise ValueError("Either 'model' or 'models' must be provided")
+        models = [model]
+        model_names = [model_name]
+    else:
+        if model_names is None:
+            model_names = [f'Model {i+1}' for i in range(len(models))]
+        elif len(models) != len(model_names):
+            raise ValueError("Length of models and model_names must match")
+    
+    # Create figure/axis if not provided
+    if ax is None:
+        plt.figure(figsize=(8, 6))
+        ax = plt.gca()
+        show_plot = True
+    else:
+        show_plot = False
+    
+    # Colors for multiple models
+    colors = ['blue', 'green', 'red', 'purple', 'orange', 'brown', 'pink', 'gray', 'olive', 'cyan']
+    
+    # Store results for reporting
+    all_results = {}
+    
+    # Process each model
+    for i, (model, name) in enumerate(zip(models, model_names)):
+        # Get probability predictions using cross-validation
+        y_proba = cross_val_predict(model, X, y, cv=5, method='predict_proba')
+        
+        # Calculate ROC curve
+        fpr, tpr, thresholds = roc_curve(y, y_proba[:, 1])
+        roc_auc = auc(fpr, tpr)
+        
+        # Also get AUC scores from cross-validation
+        auc_scores = cross_validate(model, X, y, cv=5, scoring='roc_auc')['test_score']
+        
+        # Store results
+        all_results[name] = {
+            'cv_auc_mean': auc_scores.mean(),
+            'cv_auc_std': auc_scores.std(),
+            'roc_auc': roc_auc,
+            'fpr': fpr,
+            'tpr': tpr
+        }
+        
+        # Plot ROC curve
+        color = colors[i % len(colors)]
+        ax.plot(fpr, tpr, color=color, lw=2, 
+                label=f'{name} (AUC = {roc_auc:.3f})')
+    
+    # Plot random classifier line
+    ax.plot([0, 1], [0, 1], color='red', lw=2, linestyle='--', 
+            label='Random Classifier', alpha=0.7)
+    
+    # Set plot properties
+    ax.set_xlim([0.0, 1.0])
+    ax.set_ylim([0.0, 1.05])
+    ax.set_xlabel('False Positive Rate (1 - Specificity)')
+    ax.set_ylabel('True Positive Rate (Sensitivity)')
+    
+    # Set title based on number of models
+    if len(models) == 1:
+        ax.set_title(f'ROC Curve - {model_names[0]}')
+    else:
+        ax.set_title('ROC Curves Comparison')
+    
+    ax.legend(loc="lower right")
+    ax.grid(True, alpha=0.3)
+    
+    # Print results
+    print("ROC-AUC PERFORMANCE")
+    print("=" * 50)
+    for name, results in all_results.items():
+        print(f"{name}:")
+        print(f"  Cross-validation AUC: {results['cv_auc_mean']:.3f} (±{results['cv_auc_std']:.3f})")
+        print(f"  ROC AUC: {results['roc_auc']:.3f}")
+        print()
+    
+    # Show plot only if we created our own figure
+    if show_plot:
+        plt.tight_layout()
+        plt.show()
+    
+    # return all_results
+
+def evaluate_confusion_matrix(X, y, model, model_name='Logistic Regression', ax=None):
+    """
+    Evaluates and visualizes the confusion matrix for a classification model using cross-validation.
+    This function performs 5-fold cross-validation to obtain out-of-fold predictions, computes the confusion matrix,
+    prints detailed confusion matrix statistics (including error rates), and visualizes the matrix using matplotlib.
+    Optionally, an existing matplotlib axis can be provided for plotting.
+    Args:
+        X (array-like or pd.DataFrame): Feature matrix for the input data.
+        y (array-like or pd.Series): True labels for the input data.
+        model (estimator object): Scikit-learn compatible classification model to evaluate.
+        model_name (str, optional): Name of the model to display in the plot title. Defaults to 'Logistic Regression'.
+        ax (matplotlib.axes.Axes, optional): Matplotlib axis to plot on. If None, a new figure and axis are created.
+    Prints:
+        - Confusion matrix with counts of true negatives, false positives, false negatives, and true positives.
+        - Overall error rate, Type I error (false positive rate), and Type II error (false negative rate).
+    Displays:
+        - Confusion matrix plot using matplotlib.
+    Returns:
+        None: The function prints and plots results, but does not return any value.
+        (Commented-out code is provided for returning metrics if needed.)
+    """
+    # Get predictions using cross-validation (at default threshold 0.5)
+    y_pred_cv = cross_val_predict(model, X, y, cv=5)
+
+    # Calculate confusion matrix
+    cm = confusion_matrix(y, y_pred_cv)
+
+    # Display confusion matrix
+    print("CONFUSION MATRIX")
+    print("=" * 30)
+    print("Actual vs Predicted:")
+    print(f"True Negatives (TN):  {cm[0,0]}")
+    print(f"False Positives (FP): {cm[0,1]}")
+    print(f"False Negatives (FN): {cm[1,0]}")
+    print(f"True Positives (TP):  {cm[1,1]}")
+
+    # Calculate error rates
+    total = cm.sum()
+    error_rate = (cm[0,1] + cm[1,0]) / total
+    print(f"\nOverall Error Rate: {error_rate:.1%}")
+    print(f"Type I Error (False Positive Rate): {cm[0,1]/cm[0].sum():.1%}")
+    print(f"Type II Error (False Negative Rate): {cm[1,0]/cm[1].sum():.1%}")
+
+    # Create figure/axis if not provided
+    if ax is None:
+        plt.figure(figsize=(8, 6))
+        ax = plt.gca()
+        show_plot = True
+    else:
+        show_plot = False
+
+    # Visualize confusion matrix
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['Class 0', 'Class 1'])
+    disp.plot(cmap='Blues', values_format='d', ax=ax)
+    ax.set_title(f'Confusion Matrix - {model_name}\n(5-Fold Cross-Validation Predictions)')
+    
+    # Only show if we created our own figure
+    if show_plot:
+        plt.tight_layout()
+        plt.show()
+
+    # Return confusion matrix and metrics for further analysis
+    # return {
+    #    'confusion_matrix': cm,
+    #    'error_rate': error_rate,
+    #    'type_i_error': cm[0,1]/cm[0].sum(),
+    #    'type_ii_error': cm[1,0]/cm[1].sum(),
+    #    'predictions': y_pred_cv
+    #}
+
+def simple_knn_example(X, y, points_per_class=20, test_point=None):
+    """
+    Visualizes a simple k-Nearest Neighbors (k-NN) classification example using a 2D dataset.
+    This function selects a subset of points from each class for visualization, plots the data along with a test point,
+    and demonstrates the k-NN classification process (with k=5) by highlighting the nearest neighbors and showing the
+    predicted class for the test point. The function also prints details about the nearest neighbors and the prediction.
+    Args:
+        X (np.ndarray): Feature matrix of shape (n_samples, 2), where each row is a data point with two features.
+        y (np.ndarray): Array of class labels (0 or 1) of shape (n_samples,).
+        points_per_class (int, optional): Number of points to sample from each class for visualization. Defaults to 20.
+        test_point (np.ndarray, optional): A 2D array of shape (1, 2) representing the test point. If None, defaults to [[0, 0]].
+    Returns:
+        None: This function displays plots and prints information but does not return any value.
+    """
+    # First, let's create a subset for cleaner visualization
+    np.random.seed(42)
+    class_0_indices = np.where(y == 0)[0]
+    class_1_indices = np.where(y == 1)[0]
+
+    # Sample `points_per_class` points from each class
+    subset_0 = np.random.choice(class_0_indices, points_per_class, replace=False)
+    subset_1 = np.random.choice(class_1_indices, points_per_class, replace=False)
+    subset_indices = np.concatenate([subset_0, subset_1])
+
+    X_subset = X[subset_indices]
+    y_subset = y[subset_indices]
+
+    # Choose a test point for demonstration
+    if test_point is None:
+        test_point = np.array([[0, 0]])
+
+    fig, axes = plt.subplots(1, 2, figsize=(15, 6))
+
+    # Plot 1: Show the subset with test point
+    ax1 = axes[0]
+    scatter1 = ax1.scatter(X_subset[:, 0], X_subset[:, 1], c=y_subset, 
+                        cmap='viridis', s=100, alpha=0.8, edgecolors='black')
+    ax1.scatter(test_point[0, 0], test_point[0, 1], c='red', s=200, marker='X', 
+            edgecolors='black', linewidth=2, label='Test Point')
+    ax1.set_xlabel('Feature 1')
+    ax1.set_ylabel('Feature 2')
+    ax1.set_title(f'Dataset Subset ({points_per_class} points per class) + Test Point')
+    ax1.grid(True, alpha=0.3)
+    ax1.legend()
+
+    # Plot 2: Show KNN with k=5
+    k = 5
+    ax2 = axes[1]
+
+    # Calculate distances from test point to subset points
+    distances = np.sqrt(np.sum((X_subset - test_point)**2, axis=1))
+    k_indices = np.argsort(distances)[:k]
+
+    # Plot all points in grey first
+    ax2.scatter(X_subset[:, 0], X_subset[:, 1], c='lightgrey', s=100, 
+            alpha=0.5, edgecolors='black')
+
+    # Highlight the k nearest neighbors with their true colors
+    k_neighbors_classes = y_subset[k_indices]
+    k_neighbors_points = X_subset[k_indices]
+    ax2.scatter(k_neighbors_points[:, 0], k_neighbors_points[:, 1], 
+            c=k_neighbors_classes, cmap='viridis', s=120, alpha=0.9, 
+            edgecolors='red', linewidth=2)
+
+    # Make prediction based on majority vote
+    prediction = 1 if np.sum(k_neighbors_classes) > k/2 else 0
+    prediction_color = 'yellow' if prediction == 1 else 'purple'
+
+    # Plot test point with predicted color
+    ax2.scatter(test_point[0, 0], test_point[0, 1], c=prediction_color, s=200, 
+            marker='X', edgecolors='black', linewidth=3, label=f'Test Point (Predicted: Class {prediction})')
+
+    ax2.set_xlabel('Feature 1')
+    ax2.set_ylabel('Feature 2')
+    ax2.set_title(f'KNN with k={k}\nRed borders = {k} nearest neighbors')
+    ax2.grid(True, alpha=0.3)
+    ax2.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+    # Show the detailed process
+    print(f"\nNearest neighbor classes: {k_neighbors_classes}")
+    print(f"Class 0 votes: {np.sum(k_neighbors_classes == 0)}")
+    print(f"Class 1 votes: {np.sum(k_neighbors_classes == 1)}")
+    print(f"Prediction: Class {prediction} (majority vote)")
+    print(f"\nDistances to {k} nearest neighbors: {np.round(np.sort(distances)[:k], 3)}")
+
+def find_optimal_intercept_and_margin(slope, X_data, y_data):
+    """
+    Finds the optimal intercept and margin for a linear separator with a given slope.
+    Given a slope, this function computes the intercept that maximizes the minimum margin
+    between two classes in a 2D dataset. It assumes class 0 should be below the line and
+    class 1 should be above the line.
+    Args:
+        slope (float): The slope of the separating line.
+        X_data (np.ndarray): 2D array of shape (n_samples, 2) containing the data points.
+        y_data (np.ndarray): 1D array of shape (n_samples,) containing class labels (0 or 1).
+    Returns:
+        tuple: A tuple containing:
+            - optimal_intercept (float): The intercept that maximizes the minimum margin.
+            - margin (float): The maximum achievable margin for the given slope.
+            - max_class0_intercept (float): The largest intercept for class 0 points.
+            - min_class1_intercept (float): The smallest intercept for class 1 points.
+    Raises:
+        ValueError: If the input arrays have incompatible shapes or if there is no valid margin.
+    """
+    # For each class, find the range of intercepts that would separate it
+    class_intercepts = []
+    
+    for class_val in [0, 1]:
+        mask = y_data == class_val
+        class_points = X_data[mask]
+        
+        # For line y = slope * x + intercept, rearrange to intercept = y - slope * x
+        intercepts_for_class = class_points[:, 1] - slope * class_points[:, 0]
+        class_intercepts.append(intercepts_for_class)
+    
+    # For separation: Class 0 should be below line, Class 1 should be above line
+    # So intercept should be: max(class_0_intercepts) < intercept < min(class_1_intercepts)
+    max_class0_intercept = np.max(class_intercepts[0])
+    min_class1_intercept = np.min(class_intercepts[1])
+    
+    # The optimal intercept is in the middle of this range
+    optimal_intercept = (max_class0_intercept + min_class1_intercept) / 2
+    
+    # The margin is half the distance between these boundary intercepts
+    margin = (min_class1_intercept - max_class0_intercept) / (2 * np.sqrt(1 + slope**2))
+    
+    return optimal_intercept, margin, max_class0_intercept, min_class1_intercept
+
+def plot_optimal_separators(X_data, y_data, show_margins=False):
+    """
+    Plots optimal linear decision boundaries (separators) for a 2D dataset, optionally visualizing the margins for each separator.
+    The function draws multiple separator lines with different slopes, computes their optimal intercepts and margins using
+    `find_optimal_intercept_and_margin`, and displays the data points colored by class. If `show_margins` is True, the margin
+    boundaries and the margin area for each separator are also visualized.
+    Args:
+        X_data (np.ndarray): 2D array of shape (n_samples, 2) containing the standardized feature data.
+        y_data (np.ndarray): 1D array of shape (n_samples,) containing binary class labels (0 or 1).
+        show_margins (bool, optional): If True, displays the margin boundaries and fills the margin area for each separator.
+            Defaults to False.
+    Returns:
+        None: This function displays a matplotlib plot and does not return any value.
+    """
+    # Define slopes and colors
+    slopes = [-0.35, 0., 0.3]
+    separator_colors = ['blue', 'orange', 'green']
+    separator_labels = ['Separator 1', 'Separator 2', 'Separator 3']
+    
+    # Set up the plot
+    plt.figure(figsize=(8, 6))
+    
+    # Plot the data points
+    colors = ['red', 'blue']
+    for class_val in [0, 1]:
+        mask = y_data == class_val
+        plt.scatter(X_data[mask, 0], X_data[mask, 1], c=colors[class_val], 
+                    label=f'Class {class_val}', alpha=0.7, s=50, 
+                    edgecolors='black', linewidth=0.5)
+    
+    x_range = np.linspace(X_data[:, 0].min() - 0.5, X_data[:, 0].max() + 0.5, 100)
+    
+    # Plot each separator
+    for i, (slope, color, label) in enumerate(zip(slopes, separator_colors, separator_labels)):
+        
+        optimal_intercept, margin, bound_0, bound_1 = find_optimal_intercept_and_margin(slope, X_data, y_data)
+        
+        # Update label to include margin if showing margins
+        if show_margins:
+            label = f'{label} (Margin: {margin:.3f})'
+        
+        # Plot main separator line
+        y_line = slope * x_range + optimal_intercept
+        plt.plot(x_range, y_line, color=color, linewidth=3, 
+                 label=label, alpha=0.8)
+        
+        # Plot margins if requested
+        if show_margins:
+            # Plot margin boundaries
+            y_upper = slope * x_range + bound_1
+            y_lower = slope * x_range + bound_0
+            
+            plt.plot(x_range, y_upper, color=color, 
+                     linestyle='--', alpha=0.6, linewidth=1.5)
+            plt.plot(x_range, y_lower, color=color, 
+                     linestyle='--', alpha=0.6, linewidth=1.5)
+            
+            # Fill the margin area
+            plt.fill_between(x_range, y_lower, y_upper, alpha=0.1, color=color)
+    
+    # Set labels and title
+    plt.xlabel('Feature 1 (Standardized)')
+    plt.ylabel('Feature 2 (Standardized)')
+    
+    if show_margins:
+        plt.title('Optimal Decision Boundaries with Margin Visualization')
+    else:
+        plt.title('Optimal Decision Boundaries for Different Slopes')
+    
+    plt.legend()#bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+
+def visualize_svm(X, y, ax=None, svm_model=None, kernel_name='Linear Kernel'):
+    """
+    Visualizes the decision boundary of a Support Vector Machine (SVM) classifier on 2D data.
+    This function fits an SVM (if not provided), plots the data points, the SVM decision boundary,
+    margins, and optionally the support vectors. It also displays the classification accuracy in the plot title.
+    Args:
+        X (np.ndarray): Feature matrix of shape (n_samples, 2).
+        y (np.ndarray): Target labels of shape (n_samples,).
+        ax (matplotlib.axes.Axes, optional): Matplotlib Axes object to plot on. If None, a new figure and axes are created.
+        svm_model (sklearn.svm.SVC, optional): Pre-trained SVM model. If None, a linear SVM is fitted to the data.
+        kernel_name (str, optional): Name of the kernel to display in the plot title. Defaults to 'Linear Kernel'.
+    Returns:
+        None
+    """
+
+    def plot_svc_decision_function(model, ax=None, plot_support=False):
+        """Plot the decision function for a 2D SVC"""
+        if ax is None:
+            ax = plt.gca()
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        
+        # create grid to evaluate model
+        x = np.linspace(xlim[0], xlim[1], 50)
+        y = np.linspace(ylim[0], ylim[1], 50)
+        Y, X = np.meshgrid(y, x)
+        xy = np.vstack([X.ravel(), Y.ravel()]).T
+        P = model.decision_function(xy).reshape(X.shape)
+        
+        # plot decision boundary and margins
+        ax.contour(X, Y, P, colors='k',
+                levels=[-1, 0, 1], alpha=0.5,
+                linestyles=['--', '-', '--'])
+        
+        # plot support vectors
+        if plot_support:
+            ax.scatter(model.support_vectors_[:, 0],
+                    model.support_vectors_[:, 1],
+                    s=300, linewidth=1, facecolors='none', edgecolors='black')
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+
+    if svm_model is None:
+        # Fit SVM with linear kernel
+        svm_model = SVC(kernel='linear', C=1E10, random_state=42)
+        svm_model.fit(X, y)
+
+    # Make predictions and calculate metrics
+    y_pred = svm_model.predict(X)
+    accuracy = accuracy_score(y, y_pred)
+
+    # Create figure only if ax is not provided
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 8))
+        show_plot = True
+    else:
+        show_plot = False
+
+    # Plot the data points
+    colors = ['red', 'blue']
+    for class_val in [0, 1]:
+        mask = y == class_val
+        ax.scatter(X[mask, 0], X[mask, 1], c=colors[class_val], 
+                    label=f'Class {class_val}', alpha=0.7, s=50, 
+                    edgecolors='black', linewidth=0.5)
+
+    # Plot SVM decision function
+    plot_svc_decision_function(svm_model, ax=ax)
+
+    ax.set_xlabel('Feature 1')
+    ax.set_ylabel('Feature 2')
+    ax.set_title(f'SVM with {kernel_name}\nAccuracy: {accuracy:.3f}')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    
+    # Only show plot if we created the figure
+    if show_plot:
+        plt.show()
+
+    # return svm_model, accuracy
+
+def calculate_results_svm(X, y, svm_model, C_val):
+    """
+    Calculates SVM classification results and metrics for a given dataset and trained SVM model.
+    Args:
+        X (array-like): Feature matrix used for prediction.
+        y (array-like): True labels corresponding to X.
+        svm_model (sklearn.svm.SVC): Trained SVM model.
+        C_val (float): Regularization parameter value used in the SVM.
+    Returns:
+        dict: A dictionary containing:
+            - 'C' (float): The regularization parameter value.
+            - 'accuracy' (float): Classification accuracy on the provided data.
+            - 'margin' (float): The margin of the SVM decision boundary.
+            - 'n_support_vectors' (int): Number of support vectors used by the model.
+    """
+    # Make predictions and calculate metrics
+    y_pred = svm_model.predict(X)
+    accuracy = accuracy_score(y, y_pred)
+    
+    # Calculate margin
+    w = svm_model.coef_[0]
+    margin = 1 / np.linalg.norm(w)
+
+    return {
+        'C': C_val,
+        'accuracy': accuracy,
+        'margin': margin,
+        'n_support_vectors': len(svm_model.support_)
+    }
+
+### Deep Learning
+
+def interactive_relu_demo():
+    """Interactive demonstration of how ReLU combinations create different functions"""
+    
+    # Create x-axis
+    x = torch.linspace(-2, 2, 1000)
+    
+    def plot_relu_combination(weight1=1.0, bias1=0.0, weight2=-0.5, bias2=0.5, weight3=0.3, bias3=-1.0):
+        """Plot combination of 3 ReLU functions with adjustable parameters"""
+        
+        # Compute individual ReLU functions
+        relu1 = weight1 * torch.relu(x + bias1)
+        relu2 = weight2 * torch.relu(x + bias2)  
+        relu3 = weight3 * torch.relu(x + bias3)
+        
+        # Combine all ReLUs
+        combined = relu1 + relu2 + relu3
+        
+        # Create the plot
+        plt.figure(figsize=(14, 8))
+        
+        # Plot individual ReLUs
+        plt.subplot(1, 2, 1)
+        plt.plot(x, relu1, 'r-', linewidth=2, label=f'ReLU1: {weight1:.1f}*ReLU(x + {bias1:.1f})')
+        plt.plot(x, relu2, 'g-', linewidth=2, label=f'ReLU2: {weight2:.1f}*ReLU(x + {bias2:.1f})')
+        plt.plot(x, relu3, 'b-', linewidth=2, label=f'ReLU3: {weight3:.1f}*ReLU(x + {bias3:.1f})')
+        plt.axhline(y=0, color='k', linestyle='--', alpha=0.3)
+        plt.axvline(x=0, color='k', linestyle='--', alpha=0.3)
+        plt.title('Individual ReLU Functions')
+        plt.xlabel('x')
+        plt.ylabel('ReLU(x)')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.ylim(-3, 3)
+        
+        # Plot combined function
+        plt.subplot(1, 2, 2)
+        plt.plot(x, combined, 'purple', linewidth=3, label='Combined Function')
+        plt.axhline(y=0, color='k', linestyle='--', alpha=0.3)
+        plt.axvline(x=0, color='k', linestyle='--', alpha=0.3)
+        plt.title('Combined ReLU Function')
+        plt.xlabel('x')
+        plt.ylabel('f(x)')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.ylim(-3, 3)
+        
+        plt.tight_layout()
+        plt.show()
+        
+    # Create interactive sliders
+    weight_layout = Layout(width='300px')
+    bias_layout = Layout(width='300px')
+    
+    interact(plot_relu_combination,
+             weight1=FloatSlider(min=-2, max=2, step=0.1, value=1.0, description='Weight 1:', layout=weight_layout),
+             bias1=FloatSlider(min=-2, max=2, step=0.1, value=0.0, description='Bias 1:', layout=bias_layout),
+             weight2=FloatSlider(min=-2, max=2, step=0.1, value=1.0, description='Weight 2:', layout=weight_layout),
+             bias2=FloatSlider(min=-2, max=2, step=0.1, value=0.5, description='Bias 2:', layout=bias_layout),
+             weight3=FloatSlider(min=-2, max=2, step=0.1, value=1.0, description='Weight 3:', layout=weight_layout),
+             bias3=FloatSlider(min=-2, max=2, step=0.1, value=-0.5, description='Bias 3:', layout=bias_layout))
+    
+def simple_sine_dataset(N=10):
+    x_train = torch.linspace(0, 2*np.pi, N).view(-1, 1)
+    y_train = torch.sin(x_train)    
+    return x_train, y_train
+
+def approximate_function(x_train, y_train):
+    
+    # Number of ReLUs needed
+    n_relus = x_train.shape[0] - 1
+    
+    # Dense x-axis for smooth plotting
+    x = torch.linspace(torch.min(x_train), torch.max(x_train), 1000)
+    
+    ## COMPUTE RELU ACTIVATIONS
+    # Set bias terms to "activate" ReLUs at training points
+    b = -x_train[:-1]
+    
+    # Compute ReLU activations: ReLU(x + bias)
+    relu_acts = torch.zeros((n_relus, x.shape[0]))
+    for i_relu in range(n_relus):
+        relu_acts[i_relu, :] = torch.relu(x + b[i_relu])
+    
+    ## COMBINE RELU ACTIVATIONS
+    # Calculate weights to match target function slopes
+    combination_weights = torch.zeros((n_relus,))
+    
+    prev_slope = 0
+    for i in range(n_relus):
+        delta_x = x_train[i+1] - x_train[i]
+        slope = (y_train[i+1] - y_train[i]) / delta_x
+        combination_weights[i] = slope - prev_slope
+        prev_slope = slope
+    
+    # Final approximation: weighted sum of ReLUs
+    y_hat = combination_weights @ relu_acts
+    
+    return y_hat, relu_acts, x, combination_weights
+
+def plot_function_approximation(x_train, y_train, x, relu_acts, y_hat, combination_weights):
+    
+    # Original function for comparison
+    y_true = torch.sin(x)
+
+    # Set consistent axis limits for all plots
+    x_lim = [float(torch.min(x))-0.2, float(torch.max(x))+0.2]
+    y_lim = [-2, 2]  # Accommodate both sine function and individual ReLUs
+    
+    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+    
+    # Plot 1: Original function
+    axes[0,0].plot(x, y_true, 'b-', linewidth=2, label='True sine function')
+    axes[0,0].scatter(x_train.flatten(), y_train.flatten(), color='red', s=50, zorder=5, label='Training points')
+    axes[0,0].set_title('Target Function: sin(x)')
+    axes[0,0].legend()
+    axes[0,0].grid(True, alpha=0.3)
+    
+    # Plot 2: Individual ReLU functions
+    axes[0,1].set_title('First 3 Individual ReLU Components')
+    colors = plt.cm.viridis(np.linspace(0, 1, relu_acts.shape[0]))
+    for i in range(min(3, relu_acts.shape[0])):  # Show first 5 ReLUs
+        axes[0,1].plot(x, combination_weights[i] * relu_acts[i], color=colors[i], alpha=0.7, label=f'ReLU {i+1}')
+    axes[0,1].legend()
+    axes[0,1].grid(True, alpha=0.3)
+    axes[0,1].set_xlim(x_lim)
+    axes[0,1].set_ylim(y_lim)
+    axes[0,0].set_xlim(x_lim)
+    axes[0,0].set_ylim(y_lim)
+    
+    # Plot 3: Cumulative approximation
+    axes[1,0].set_title('Building the Approximation')
+    axes[1,0].plot(x, y_true, 'b-', linewidth=2, alpha=0.5, label='Target')
+    
+    # Show cumulative sum of ReLUs
+    cumulative = torch.zeros_like(x)
+    for i in range(min(3, relu_acts.shape[0])):
+        cumulative += combination_weights[i] * relu_acts[i]
+        axes[1,0].plot(x, cumulative, '--', alpha=0.8, label=f'Sum of first {i+1} ReLUs')
+    
+    axes[1,0].legend()
+    axes[1,0].grid(True, alpha=0.3)
+    axes[1,0].set_xlim(x_lim)
+    axes[1,0].set_ylim(y_lim)
+    
+    # Plot 4: Final approximation
+    axes[1,1].plot(x, y_true, 'b-', linewidth=2, label='True function')
+    axes[1,1].plot(x, y_hat, 'r--', linewidth=2, label='ReLU approximation')
+    axes[1,1].scatter(x_train.flatten(), y_train.flatten(), color='red', s=50, zorder=5)
+    axes[1,1].set_title('Final Approximation')
+    axes[1,1].legend()
+    axes[1,1].grid(True, alpha=0.3)
+    axes[1,1].set_xlim(x_lim)
+    axes[1,1].set_ylim(y_lim)
+    
+    plt.tight_layout()
+    plt.show()
+
+class SimpleMLP(nn.Module):
+    def __init__(self, input_size=1, hidden_size=20, output_size=1, num_layers=1):
+        """
+        Simple Neural Network with ReLU activation
+        
+        Args:
+            input_size (int): Number of input features
+            hidden_size (int): Size of hidden layers
+            output_size (int): Number of output neurons
+            num_layers (int): Number of hidden layers
+        """
+        super(SimpleMLP, self).__init__()
+        
+        self.num_layers = num_layers
+        self.layers = nn.ModuleList()
+        
+        # Input to first hidden layer
+        if num_layers > 0:
+            self.layers.append(nn.Linear(input_size, hidden_size))
+            
+            # Additional hidden layers
+            for i in range(1, num_layers):
+                self.layers.append(nn.Linear(hidden_size, hidden_size))
+            
+            # Output layer
+            self.layers.append(nn.Linear(hidden_size, output_size))
+        else:
+            # Direct input to output
+            self.layers.append(nn.Linear(input_size, output_size))
+        
+        # Store intermediate representations
+        self.representations = {}
+    
+    def forward(self, x):
+        """Forward pass with ReLU activation"""
+        # Store input representation
+        self.representations['input'] = x
+        
+        current_x = x
+        
+        # Pass through hidden layers with ReLU
+        for i in range(self.num_layers):
+            current_x = F.relu(self.layers[i](current_x))
+            self.representations[f'hidden{i+1}'] = current_x
+        
+        # Output layer (no activation)
+        if self.num_layers > 0:
+            output = self.layers[-1](current_x)
+        else:
+            output = self.layers[0](current_x)
+        
+        self.representations['output'] = output
+        
+        return output
+    
+    def get_representations(self, x):
+        """Get intermediate representations for visualization"""
+        with torch.no_grad():
+            output = self.forward(x)
+            # Convert to numpy for easy plotting
+            representations = {}
+            for key, value in self.representations.items():
+                representations[key] = value.numpy()
+            return representations
+
+def fit_model(model, x_train, y_train, epochs=2000, lr=0.01, type='regression'):
+    """Train the neural network - we'll explore this process in detail later!
+    
+    Args:
+        type: 'classification' uses CrossEntropyLoss, 'regression' uses MSELoss
+    """
+    # Set random seed for reproducibility
+    torch.manual_seed(42)
+    np.random.seed(42)
+    
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    
+    # Choose loss function based on problem type
+    if type == 'classification':
+        criterion = nn.CrossEntropyLoss()
+    else:
+        criterion = nn.MSELoss()
+    
+    losses = []
+    for epoch in range(epochs):
+        y_pred = model(x_train)
+        loss = criterion(y_pred, y_train)
+        
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        
+        losses.append(loss.item())
+    
+    return losses
+
+def create_nested_circles_data(n_samples=1000, noise=0.1, random_state=42):
+    """Create nested circles dataset using sklearn"""
+    torch.manual_seed(42)
+    np.random.seed(42)
+    X, y = make_circles(n_samples=n_samples, 
+                        noise=noise, 
+                        factor=0.3,  # ratio of inner to outer circle
+                        random_state=random_state)
+    
+    # Visualize the data
+    plt.figure(figsize=(8, 6))
+    colors = ['red', 'blue']
+    for i in range(2):
+        mask = y == i
+        plt.scatter(X[mask, 0], X[mask, 1], 
+                    c=colors[i], alpha=0.6, 
+                    label=f'Class {i}')
+    plt.title('Nested Circles Dataset')
+    plt.xlabel('X coordinate')
+    plt.ylabel('Y coordinate')
+    plt.legend()
+    plt.axis('equal')
+    plt.grid(True, alpha=0.3)
+    plt.show()
+    return torch.FloatTensor(X), torch.LongTensor(y)
+
+def visualize_decision_boundary(model, X, y):
+    """Visualize the decision boundary learned by the model"""
+    # Create a mesh
+    # Set random seed for reproducibility
+    torch.manual_seed(42)
+    np.random.seed(42)
+
+    h = 0.02
+    x_min, x_max = X[:, 0].min() - 0.1, X[:, 0].max() + 0.1
+    y_min, y_max = X[:, 1].min() - 0.1, X[:, 1].max() + 0.1
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
+                         np.arange(y_min, y_max, h))
+    
+    # Make predictions on the mesh
+    mesh_points = torch.FloatTensor(np.c_[xx.ravel(), yy.ravel()])
+    with torch.no_grad():
+        outputs = model(mesh_points)
+        predictions = torch.softmax(outputs, dim=1)[:, 1]  # Probability of class 1
+    
+    predictions = predictions.reshape(xx.shape)
+    
+    # Plot
+    plt.figure(figsize=(8, 6))
+    plt.contourf(xx, yy, predictions, levels=50, alpha=0.8, cmap='RdYlBu')
+    plt.colorbar(label='Probability of Class 1')
+    
+    # Plot data points
+    colors = ['red', 'blue']
+    for i in range(2):
+        mask = y == i
+        plt.scatter(X[mask, 0], X[mask, 1], 
+                    c=colors[i], alpha=0.7, 
+                    label=f'Class {i}', edgecolors='black', linewidth=0.5)
+    
+    plt.title('Neural Network Decision Boundary')
+    plt.xlabel('X coordinate')
+    plt.ylabel('Y coordinate')
+    plt.legend()
+    plt.axis('equal')
+    plt.show()
+
+def visualize_layer_transformations(model, X, y, n_samples=500):
+    """Visualize how data transforms through network layers using MDS"""
+    # Set random seed for reproducibility
+    torch.manual_seed(42)
+    np.random.seed(42)
+    # Sample subset for clarity
+    indices = np.random.choice(len(X), n_samples, replace=False)
+    X_sample = X[indices]
+    y_sample = y[indices]
+    
+    # Get representations from each layer
+    representations = model.get_representations(X_sample)
+    
+    # Set up the plot
+    fig, axes = plt.subplots(1, 4, figsize=(20, 5))
+    layer_names = ['Input Space', 'Hidden Layer 1', 'Hidden Layer 2', 'Output Layer']
+    layer_keys = ['input', 'hidden1', 'hidden2', 'output']
+    
+    colors = ['red', 'blue']
+    
+    for i, (layer_name, layer_key) in enumerate(zip(layer_names, layer_keys)):
+        data = representations[layer_key]
+        
+        # If more than 2 dimensions, use MDS to reduce to 2D
+        if data.shape[1] > 2:
+            mds = MDS(n_components=2, random_state=42)
+            data_2d = mds.fit_transform(data)
+        else:
+            data_2d = data
+            
+        # Plot each class
+        for class_idx in range(2):
+            mask = y_sample == class_idx
+            axes[i].scatter(data_2d[mask, 0], data_2d[mask, 1], 
+                           c=colors[class_idx], alpha=0.6, 
+                           label=f'Class {class_idx}', s=20)
+        
+        axes[i].set_title(f'{layer_name}\n({data.shape[1]}D → 2D via MDS)' if data.shape[1] > 2 
+                         else f'{layer_name}')
+        axes[i].legend()
+        axes[i].grid(True, alpha=0.3)
+        
+        # Make axes equal for input space
+        if i == 0:
+            axes[i].axis('equal')
+    
+    plt.suptitle('How Neural Networks Transform Data Through Layers', fontsize=16)
+    plt.tight_layout()
+    plt.show()
+
+def plot_multiple_epochs(X, y_true, epoch_params):
+    """Plot multiple epochs side by side"""
+    n_plots = len(epoch_params)
+    fig, axes = plt.subplots(1, n_plots, figsize=(4 * n_plots, 5))
+    
+    if n_plots == 1:
+        axes = [axes]
+    
+    for i, (epoch, weight, bias, loss) in enumerate(epoch_params):
+        axes[i].scatter(X, y_true, alpha=0.6, color='blue', label='Data')
+        x_line = np.linspace(X.min(), X.max(), 100)
+        y_line = weight * x_line + bias
+        axes[i].plot(x_line, y_line, 'r-', linewidth=2, 
+                    label=f'Model (epoch {epoch})')
+        
+        axes[i].set_title(f'Epoch {epoch}\nm={weight:.2f}, b={bias:.2f}\nLoss={loss:.2f}')
+        axes[i].set_xlabel('X')
+        axes[i].set_ylabel('Y')
+        axes[i].legend()
+        axes[i].grid(True, alpha=0.3)
+    
+    plt.suptitle('Continued Gradient Descent Training', fontsize=16)
+    plt.tight_layout()
+    plt.show()
+
+def plot_single_epoch(X, y_true, epoch, weight, bias, loss):
+    """Plot the line fit for a single epoch"""
+    plt.figure(figsize=(6, 6))
+    
+    # Plot data and current line
+    plt.scatter(X, y_true, alpha=0.6, color='blue', label='Data', s=50)
+    x_line = np.linspace(X.min(), X.max(), 100)
+    y_line = weight * x_line + bias
+    plt.plot(x_line, y_line, 'r-', linewidth=3, label=f'Model (epoch {epoch})')
+    
+    # When plotting each epoch
+    y_pred_current = bias + weight * X
+    current_loss_display = np.mean((y_true - y_pred_current) ** 2)  # MSE for display
+
+    plt.title(f'Epoch {epoch}\nSlope (m) = {weight:.3f}, Intercept (b) = {bias:.3f}\nLoss = {current_loss_display:.3f}', 
+              fontsize=14)
+    plt.xlabel('X', fontsize=12)
+    plt.ylabel('Y', fontsize=12)
+    plt.legend(fontsize=12)
+    plt.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.show()
+
+# Simple linear model
+class SimpleLinearRegression(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.linear = nn.Linear(1, 1)
+        # Initialize with random weights - this is where we start!
+        nn.init.uniform_(self.linear.weight, -3, -1)
+        nn.init.uniform_(self.linear.bias, 5, 6)
+    
+    def forward(self, x):
+        return self.linear(x)
+    
+def plot_decision_boundary_evolution(model, snapshots, epochs_to_show, X_data, y_data):
+    """
+    Plot how decision boundary evolves during training
+    """
+    fig, axes = plt.subplots(1, len(epochs_to_show), figsize=(4*len(epochs_to_show), 4))
+    
+    # Handle case where there's only one subplot
+    if len(epochs_to_show) == 1:
+        axes = [axes]
+    
+    for idx, epoch in enumerate(epochs_to_show):
+        ax = axes[idx]
+        
+        # Save current model state
+        original_state = model.state_dict()
+        
+        # Load weights from snapshot
+        model_state = {}
+        for name, param in model.named_parameters():
+            model_state[name] = snapshots[epoch]['weights'][name]
+        
+        # Update model with snapshot weights
+        model.load_state_dict(model_state, strict=False)
+        
+        # Create mesh for decision boundary
+        h = 0.02
+        x_min, x_max = X_data[:, 0].min() - 0.5, X_data[:, 0].max() + 0.5
+        y_min, y_max = X_data[:, 1].min() - 0.5, X_data[:, 1].max() + 0.5
+        xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
+                             np.arange(y_min, y_max, h))
+        
+        # Get predictions on mesh
+        mesh_points = torch.FloatTensor(np.c_[xx.ravel(), yy.ravel()])
+        model.eval()
+        with torch.no_grad():
+            raw_output = model(mesh_points)
+            # Convert to probabilities
+            if raw_output.shape[1] == 1:  # Binary classification with single output
+                probs = torch.sigmoid(raw_output.squeeze())
+            else:  # Multi-class with softmax
+                probs = torch.softmax(raw_output, dim=1)[:, 1]  # Probability of class 1
+            
+            Z = probs.numpy()
+        
+        Z = Z.reshape(xx.shape)
+        
+        # Plot decision boundary
+        contour = ax.contourf(xx, yy, Z, levels=50, alpha=0.6, cmap='RdYlBu')
+        ax.contour(xx, yy, Z, levels=[0.5], colors='black', linewidths=2, linestyles='--')
+        
+        # Plot data points
+        colors = ['red', 'blue']
+        for i in range(2):
+            mask = y_data == i
+            ax.scatter(X_data[mask, 0], X_data[mask, 1], 
+                      c=colors[i], alpha=0.8, s=30, edgecolors='black')
+        
+        ax.set_xlabel('X₁', fontsize=12)
+        ax.set_ylabel('X₂', fontsize=12)
+        ax.set_title(f'Epoch {epoch}\nLoss = {snapshots[epoch]["loss"]:.4f}', 
+                    fontsize=12, fontweight='bold')
+        ax.grid(True, alpha=0.3)
+        
+        # Restore original model state
+        model.load_state_dict(original_state)
+    
+    plt.tight_layout()
+    plt.suptitle('Neural Network Training: Decision Boundary Evolution', 
+                 fontsize=16, fontweight='bold', y=1.05)
+    plt.show()
+
+def plot_training_loss(losses, test_losses=None, epochs_to_show=None, title='Neural Network Training: Loss Decreases Over Time'):
+
+    # Plot the training loss
+    plt.figure(figsize=(8, 6))
+    plt.plot(range(len(losses)), losses, 'b-', linewidth=2, label='Training Loss')
+    if test_losses is not None:
+        plt.plot(range(len(test_losses)), test_losses, 'r--', linewidth=2, label='Test Loss')
+    plt.xlabel('Epoch', fontsize=14)
+    plt.ylabel('Loss (Binary Cross-Entropy)', fontsize=14)
+    plt.title(title, fontsize=16, fontweight='bold')
+    plt.grid(True, alpha=0.3)
+    plt.legend(fontsize=12)
+
+    # Add vertical lines at the epochs we visualized
+    if epochs_to_show is not None:
+        colors_lines = ['orange', 'green', 'purple', 'red']
+        for epoch, color in zip(epochs_to_show, colors_lines):
+            if epoch < len(losses):
+                plt.axvline(x=epoch, color=color, linestyle='--', alpha=0.7, linewidth=2)
+                plt.text(epoch-5, losses[epoch], f'Epoch {epoch}', 
+                        rotation=90, fontsize=10, ha='center', color=color, fontweight='bold')
+
+    plt.tight_layout()
+    plt.show()
+
+    # Print some statistics
+    print(f"Initial loss: {losses[0]:.4f}")
+    print(f"Final loss: {losses[-1]:.4f}")
+    print(f"Loss reduction: {((losses[0] - losses[-1]) / losses[0] * 100):.1f}%")
+
+def compare_learning_rates(dataloader, learning_rates, total_epochs):
+    """
+    Compare different learning rates by training a model for each rate
+    and storing the losses.
+    """
+    # Dictionary to store losses for each learning rate
+    all_losses = {}
+
+    for lr in learning_rates:
+        
+        # Reinitialize model for each learning rate
+        model = SimpleMLP(input_size=2, hidden_size=20, output_size=1, num_layers=2)
+        
+        # Training setup
+        criterion = nn.BCEWithLogitsLoss()
+        optimizer = optim.SGD(model.parameters(), lr=lr)
+        
+        # Storage for this learning rate
+        losses = []
+        
+        # Training loop
+        for epoch in range(total_epochs + 1):
+            epoch_loss = 0.0
+            num_batches = 0
+            
+            # Process all batches in this epoch
+            for batch_X, batch_y in dataloader:
+                # Forward pass
+                outputs = model(batch_X)
+                loss = criterion(outputs, batch_y)
+                
+                # Backward pass and optimization
+                if epoch > 0:  # Skip optimization for epoch 0
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+                
+                epoch_loss += loss.item()
+                num_batches += 1
+            
+            # Average loss for this epoch
+            avg_loss = epoch_loss / num_batches
+            losses.append(avg_loss)
+        
+        # Store results
+        all_losses[lr] = losses
+
+    # Plot comparison of learning rates
+    plt.figure(figsize=(12, 6))
+
+    colors = ['blue', 'green', 'orange', 'red']
+    labels = [f'LR = {lr}' for lr in learning_rates]
+
+    for i, lr in enumerate(learning_rates):
+        plt.plot(range(len(all_losses[lr])), all_losses[lr], 
+                color=colors[i], linewidth=2, label=labels[i])
+
+    plt.xlabel('Epoch', fontsize=14)
+    plt.ylabel('Loss (Binary Cross-Entropy)', fontsize=14)
+    plt.title('Learning Rate Comparison: How Step Size Affects Convergence', fontsize=16, fontweight='bold')
+    plt.legend(fontsize=12)
+    plt.grid(True, alpha=0.3)
+    plt.xlim(0, total_epochs)
+    plt.tight_layout()
+    plt.show()
+    
+    return all_losses
+
+def prepare_mnist(mnist, subset_size=10000):
+    # Use a subset of MNIST for faster training
+    X, y = mnist.data, mnist.target.astype(int)
+
+    # Take only 10,000 samples (about 14% of full dataset)
+    subset_size = 10000
+    indices = np.random.choice(len(X), subset_size, replace=False)
+    X_subset = X[indices]
+    y_subset = y[indices]
+
+    # Split the subset
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_subset, y_subset, test_size=0.2, random_state=42, stratify=y_subset
+    )
+
+    # Reshape for CNN (batch_size, channels, height, width)
+    # MNIST is grayscale so channels = 1
+    X_train_cnn = X_train.reshape(-1, 1, 28, 28) / 255.0  # Normalize to [0,1]
+    X_test_cnn = X_test.reshape(-1, 1, 28, 28) / 255.0
+
+    # Convert to PyTorch tensors
+    X_train_tensor = torch.FloatTensor(X_train_cnn)
+    X_test_tensor = torch.FloatTensor(X_test_cnn)
+    y_train_tensor = torch.LongTensor(y_train)
+    y_test_tensor = torch.LongTensor(y_test)
+
+    print(f"Using subset: {subset_size:,} total samples")
+    print(f"Training set: {X_train_tensor.shape[0]:,} images")
+    print(f"Test set: {X_test_tensor.shape[0]:,} images")
+    print(f"Reduction: {subset_size/len(X)*100:.1f}% of original dataset")
+
+    return X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor
+
+class SimpleCNN(nn.Module):
+    def __init__(self, input_channels=1, num_conv_layers=2, conv_channels=[32, 64], 
+                 kernel_size=3, padding=1, pool_size=2, pool_stride=2,
+                 num_fc_layers=2, fc_hidden_size=128, output_size=10, 
+                 input_height=28, input_width=28):
+        """
+        Simple CNN with configurable architecture
+        
+        Args:
+            input_channels (int): Number of input channels (1 for grayscale, 3 for RGB)
+            num_conv_layers (int): Number of convolutional layers
+            conv_channels (list): Number of channels for each conv layer
+            kernel_size (int): Convolution kernel size
+            padding (int): Padding for convolutions
+            pool_size (int): Max pooling kernel size
+            pool_stride (int): Max pooling stride
+            num_fc_layers (int): Number of fully connected layers
+            fc_hidden_size (int): Hidden size for FC layers
+            output_size (int): Number of output classes
+            input_height (int): Height of input images
+            input_width (int): Width of input images
+        """
+        super(SimpleCNN, self).__init__()
+        
+        self.num_conv_layers = num_conv_layers
+        self.num_fc_layers = num_fc_layers
+        self.input_height = input_height
+        self.input_width = input_width
+        
+        # Convolutional layers
+        self.conv_layers = nn.ModuleList()
+        self.pool_layers = nn.ModuleList()
+        
+        # Build conv layers
+        in_channels = input_channels
+        for i in range(num_conv_layers):
+            out_channels = conv_channels[i] if i < len(conv_channels) else conv_channels[-1]
+            self.conv_layers.append(nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding))
+            self.pool_layers.append(nn.MaxPool2d(pool_size, pool_stride))
+            in_channels = out_channels
+        
+        # Calculate the size after conv layers
+        self.conv_output_size = self._calculate_conv_output_size()
+        
+        # Fully connected layers
+        self.fc_layers = nn.ModuleList()
+        
+        if num_fc_layers > 0:
+            # First FC layer (after flattening)
+            self.fc_layers.append(nn.Linear(self.conv_output_size, fc_hidden_size))
+            
+            # Additional hidden FC layers
+            for i in range(1, num_fc_layers):
+                self.fc_layers.append(nn.Linear(fc_hidden_size, fc_hidden_size))
+            
+            # Output layer
+            self.fc_layers.append(nn.Linear(fc_hidden_size, output_size))
+        else:
+            # Direct conv to output
+            self.fc_layers.append(nn.Linear(self.conv_output_size, output_size))
+        
+        # Store intermediate representations
+        self.representations = {}
+    
+    def _calculate_conv_output_size(self):
+        """Calculate the output size after all conv and pooling layers"""
+        with torch.no_grad():
+            # Create a dummy input to calculate output size
+            dummy_input = torch.zeros(1, 1 if not hasattr(self, 'input_channels') else self.input_channels, 
+                                    self.input_height, self.input_width)
+            
+            x = dummy_input
+            for i in range(self.num_conv_layers):
+                x = self.pool_layers[i](F.relu(self.conv_layers[i](x)))
+            
+            return x.view(1, -1).size(1)
+    
+    def forward(self, x):
+        """Forward pass with ReLU activation"""
+        # Store input representation
+        self.representations['input'] = x
+        
+        current_x = x
+        
+        # Convolutional layers
+        for i in range(self.num_conv_layers):
+            current_x = F.relu(self.conv_layers[i](current_x))
+            self.representations[f'conv{i+1}'] = current_x
+            
+            current_x = self.pool_layers[i](current_x)
+            self.representations[f'pool{i+1}'] = current_x
+        
+        # Flatten for FC layers
+        flattened = current_x.view(current_x.size(0), -1)
+        self.representations['flattened'] = flattened
+        
+        current_x = flattened
+        
+        # Fully connected layers (except output)
+        for i in range(self.num_fc_layers):
+            current_x = F.relu(self.fc_layers[i](current_x))
+            self.representations[f'fc{i+1}'] = current_x
+        
+        # Output layer (no activation)
+        if self.num_fc_layers > 0:
+            output = self.fc_layers[-1](current_x)
+        else:
+            output = self.fc_layers[0](current_x)
+        
+        self.representations['output'] = output
+        
+        return output
+    
+    def get_representations(self, x):
+        """Get intermediate representations for visualization"""
+        with torch.no_grad():
+            output = self.forward(x)
+            # Convert to numpy for easy plotting
+            representations = {}
+            for key, value in self.representations.items():
+                if value.dim() > 2:  # For conv layers, keep shape info
+                    representations[key] = value.cpu().numpy()
+                else:  # For FC layers, flatten if needed
+                    representations[key] = value.cpu().numpy()
+            return representations
+
+    def get_feature_maps(self, x, layer_name):
+        """Get feature maps from a specific convolutional layer"""
+        with torch.no_grad():
+            self.forward(x)
+            if layer_name in self.representations:
+                return self.representations[layer_name].cpu().numpy()
+            else:
+                available_layers = list(self.representations.keys())
+                raise ValueError(f"Layer {layer_name} not found. Available layers: {available_layers}")
+
+    def summary(self):
+        """Print network architecture summary"""
+        print("SimpleCNN Architecture:")
+        print(f"Input shape: ({self.input_height}, {self.input_width})")
+        print("\nConvolutional Layers:")
+        for i, conv in enumerate(self.conv_layers):
+            print(f"  Conv{i+1}: {conv}")
+            print(f"  Pool{i+1}: {self.pool_layers[i]}")
+        
+        print(f"\nFlattened size: {self.conv_output_size}")
+        print("\nFully Connected Layers:")
+        for i, fc in enumerate(self.fc_layers):
+            print(f"  FC{i+1}: {fc}")
+
+def extract_and_plot_feature_maps(model, sample_image, sample_label, category_name='Digit'):
+
+    # Get feature maps using built-in method
+    model.eval()
+    with torch.no_grad():
+        conv1_features = model.get_feature_maps(sample_image, 'conv1')  # Shape: (1, 32, 28, 28)
+        conv2_features = model.get_feature_maps(sample_image, 'conv2')  # Shape: (1, 64, 14, 14)
+
+    # Convert for plotting
+    conv1_maps = conv1_features[0]  # (32, 28, 28)
+    conv2_maps = conv2_features[0]  # (64, 14, 14)
+    original_img = sample_image[0, 0].cpu().numpy()  # (28, 28)
+
+    print(f"Analyzing {category_name}: {sample_label}")
+    print(f"Conv1 feature maps shape: {conv1_maps.shape}")
+    print(f"Conv2 feature maps shape: {conv2_maps.shape}")
+
+    # Plot original image and feature maps in 2 levels
+    fig = plt.figure(figsize=(15, 8))
+
+    # TOP LEVEL: Original + Conv1 feature maps
+    # Original image
+    plt.subplot(2, 6, 1)
+    plt.imshow(original_img, cmap='gray')
+    plt.title(f'Original\n{category_name}: {sample_label}', fontsize=12, fontweight='bold')
+    plt.axis('off')
+
+    # First conv layer feature maps (show first 5)
+    for i in range(5):
+        plt.subplot(2, 6, i + 2)
+        plt.imshow(conv1_maps[i], cmap='viridis')
+        plt.title(f'Conv1\nFilter {i+1}', fontsize=10)
+        plt.axis('off')
+
+    # BOTTOM LEVEL: Conv2 feature maps after pooling
+    for i in range(5):
+        plt.subplot(2, 6, i + 8)
+        plt.imshow(conv2_maps[i], cmap='plasma')
+        plt.title(f'Conv2\nFilter {i+1}', fontsize=10)
+        plt.axis('off')
+
+    # Add separator text in the remaining spot
+    plt.subplot(2, 6, 7)
+    plt.text(0.5, 0.5, 'After\nPooling', ha='center', va='center', fontsize=12, fontweight='bold')
+    plt.axis('off')
+
+    plt.suptitle('Feature Maps: How CNN "Sees" the Image at Different Layers', fontsize=16, fontweight='bold')
+    plt.tight_layout()
+    plt.show()
+
+def visualize_cnn_representations(model, X_test_tensor, y_test_tensor, num_samples=500):
+    # Use a subset of test data for visualization (500 samples for speed)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    n_samples = 500
+    indices = np.random.choice(len(X_test_tensor), n_samples, replace=False)
+    sample_data = X_test_tensor[indices].to(device)
+    sample_labels = y_test_tensor[indices].cpu().numpy()
+
+    # Get representations
+    representations = model.get_representations(sample_data)
+
+    print(f"Analyzing {n_samples} test samples")
+    print(f"Flattened conv features: {representations['flattened'].shape}")
+    print(f"FC1 representations: {representations['fc1'].shape}")
+    print(f"FC2 representations: {representations['fc2'].shape}")
+
+    # Standardize and apply MDS to all three representations
+    scaler_flat = StandardScaler()
+    flat_scaled = scaler_flat.fit_transform(representations['flattened'])
+    mds_flat = MDS(n_components=2, random_state=42, normalized_stress='auto')
+    flat_2d = mds_flat.fit_transform(flat_scaled)
+
+    scaler_fc1 = StandardScaler()
+    fc1_scaled = scaler_fc1.fit_transform(representations['fc1'])
+    mds_fc1 = MDS(n_components=2, random_state=42, normalized_stress='auto')
+    fc1_2d = mds_fc1.fit_transform(fc1_scaled)
+
+    scaler_fc2 = StandardScaler()
+    fc2_scaled = scaler_fc2.fit_transform(representations['fc2'])
+    mds_fc2 = MDS(n_components=2, random_state=42, normalized_stress='auto')
+    fc2_2d = mds_fc2.fit_transform(fc2_scaled)
+
+    # Create three-panel visualization
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(20, 6))
+    colors = plt.cm.tab10(np.arange(10))
+
+    # Flattened conv representations
+    for digit in range(10):
+        mask = sample_labels == digit
+        if np.any(mask):
+            ax1.scatter(flat_2d[mask, 0], flat_2d[mask, 1], 
+                    c=[colors[digit]], s=20, alpha=0.6, 
+                    label=f'Digit {digit}')
+
+    ax1.set_xlabel('MDS Dimension 1', fontsize=12)
+    ax1.set_ylabel('MDS Dimension 2', fontsize=12)
+    ax1.set_title('Flattened Conv Features\n(3136D → 2D, Raw Conv Output)', 
+                fontsize=14, fontweight='bold')
+    ax1.grid(True, alpha=0.3)
+
+    # FC1 representations
+    for digit in range(10):
+        mask = sample_labels == digit
+        if np.any(mask):
+            ax2.scatter(fc1_2d[mask, 0], fc1_2d[mask, 1], 
+                    c=[colors[digit]], s=20, alpha=0.6, 
+                    label=f'Digit {digit}')
+
+    ax2.set_xlabel('MDS Dimension 1', fontsize=12)
+    ax2.set_ylabel('MDS Dimension 2', fontsize=12)
+    ax2.set_title('FC1 Layer Representations\n(128D → 2D, Intermediate Features)', 
+                fontsize=14, fontweight='bold')
+    ax2.grid(True, alpha=0.3)
+
+    # FC2 representations (pre-softmax logits)
+    for digit in range(10):
+        mask = sample_labels == digit
+        if np.any(mask):
+            ax3.scatter(fc2_2d[mask, 0], fc2_2d[mask, 1], 
+                    c=[colors[digit]], s=20, alpha=0.6, 
+                    label=f'Digit {digit}')
+
+    ax3.set_xlabel('MDS Dimension 1', fontsize=12)
+    ax3.set_ylabel('MDS Dimension 2', fontsize=12)
+    ax3.set_title('FC2 Layer Representations\n(128D → 2D, Second Intermediate Features)', 
+                fontsize=14, fontweight='bold')
+    ax3.grid(True, alpha=0.3)
+
+    # Single legend
+    handles, labels = ax1.get_legend_handles_labels()
+    fig.legend(handles, labels, bbox_to_anchor=(1.02, 0.5), loc='center left')
 
     plt.tight_layout()
     plt.show()
