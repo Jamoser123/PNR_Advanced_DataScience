@@ -2586,17 +2586,21 @@ def cross_validate_regularization(X, y, num_coef=8, alphas=np.logspace(-3, 3, 50
 
     return optimal_alpha
 
-def regularization_coef_progression(X, y, num_coef=8, alphas=np.logspace(-3, 3, 50), optimal_alpha=None, model_name="Ridge"):
+import matplotlib.lines as mlines
+
+def regularization_coef_progression(X, y, num_coef=None, alphas=np.logspace(-3, 3, 50), optimal_alpha=None, model_name="Ridge"):
     """
     Plots the progression of regression coefficients as a function of the regularization parameter (alpha)
     for Ridge, Lasso, or ElasticNet regression models.
     This function visualizes how the coefficients of each feature change as the regularization strength varies.
-    Signal features (first `num_coef` features) are highlighted with thick lines, while noise features are shown
-    with thin gray lines. Optionally, the optimal alpha can be indicated with a vertical dashed line.
+    If num_coef is specified, the first `num_coef` features are highlighted with thick lines as signal features, 
+    while remaining features are shown with thin gray lines as noise features. If num_coef is None, all features 
+    are plotted with the same style for independent dataset analysis.
     Args:
         X (np.ndarray or pd.DataFrame): Feature matrix of shape (n_samples, n_features).
         y (np.ndarray or pd.Series): Target vector of shape (n_samples,).
-        num_coef (int, optional): Number of signal features to highlight. Defaults to 8.
+        num_coef (int or None, optional): Number of signal features to highlight. If None, all features 
+            are treated equally without distinction. Defaults to 8.
         alphas (array-like, optional): Sequence of alpha values to use for regularization. Defaults to np.logspace(-3, 3, 50).
         optimal_alpha (float, optional): Value of the optimal alpha to highlight on the plot. Defaults to None.
         model_name (str, optional): Type of regression model to use. Must be one of "Ridge", "Lasso", or "ElasticNet". Defaults to "Ridge".
@@ -2605,9 +2609,12 @@ def regularization_coef_progression(X, y, num_coef=8, alphas=np.logspace(-3, 3, 
     Raises:
         ValueError: If `model_name` is not one of "Ridge", "Lasso", or "ElasticNet".
     Example:
+        >>> # For synthetic data with known signal features
         >>> regularization_coef_progression(X, y, num_coef=5, model_name="Lasso", optimal_alpha=0.1)
+        >>> # For independent dataset analysis
+        >>> regularization_coef_progression(X, y, num_coef=None, model_name="Lasso", optimal_alpha=0.1)
     """
-    # Plot coefficient paths for Ridge regression
+    # Plot coefficient paths for regularization
     plt.figure(figsize=(12, 8))
 
     if model_name == "Ridge": 
@@ -2616,53 +2623,80 @@ def regularization_coef_progression(X, y, num_coef=8, alphas=np.logspace(-3, 3, 
         model_fam = Lasso
     elif model_name == "ElasticNet":
         model_fam = ElasticNet
+    else:
+        raise ValueError("model_name must be one of 'Ridge', 'Lasso', or 'ElasticNet'")
 
     # Store coefficients for each alpha
     coefficients = []
 
     for alpha in alphas:
-        ridge = model_fam(alpha=alpha)
-        ridge.fit(X, y)
-        coefficients.append(ridge.coef_)
+        model = model_fam(alpha=alpha)
+        model.fit(X, y)
+        coefficients.append(model.coef_)
 
     coefficients = np.array(coefficients)
 
     # Plot coefficient paths
-    signal_features = range(num_coef)  # Assume first num_coef features are signal features
+    if num_coef is not None:
+        # Original behavior: distinguish between signal and noise features
+        signal_features = range(num_coef)  # Assume first num_coef features are signal features
 
-    for feature_idx in range(X.shape[1]):
-        if feature_idx in signal_features:
-            # Thick lines for signal features
+        for feature_idx in range(X.shape[1]):
+            if feature_idx in signal_features:
+                # Thick lines for signal features
+                plt.plot(np.log10(alphas), coefficients[:, feature_idx], 
+                        linewidth=3, alpha=0.8, 
+                        label=f'Signal Feature {feature_idx}' if feature_idx in signal_features[:4] else "")
+            else:
+                # Thin lines for noise features
+                plt.plot(np.log10(alphas), coefficients[:, feature_idx], 
+                        linewidth=1, alpha=0.6, color='gray')
+        
+        # Create custom legend for signal/noise distinction
+        signal_line = mlines.Line2D([], [], color='C0', linewidth=3, label='Signal Features (thick)')
+        noise_line = mlines.Line2D([], [], color='gray', linewidth=1, label='Noise Features (thin)')
+        handles = [signal_line, noise_line]
+    else:
+        # New behavior: treat all features equally for independent dataset analysis
+        # Use a colormap to distinguish features
+        colors = plt.cm.tab10(np.linspace(0, 1, min(10, X.shape[1])))
+        
+        for feature_idx in range(X.shape[1]):
+            color = colors[feature_idx % len(colors)] if X.shape[1] <= 10 else None
             plt.plot(np.log10(alphas), coefficients[:, feature_idx], 
-                    linewidth=3, alpha=0.8, 
-                    label=f'Signal Feature {feature_idx}' if feature_idx in signal_features[:4] else "")
-        else:
-            # Thin lines for noise features
-            plt.plot(np.log10(alphas), coefficients[:, feature_idx], 
-                    linewidth=1, alpha=0.6, color='gray')
+                    linewidth=2, alpha=0.7, color=color,
+                    label=f'Feature {feature_idx}' if X.shape[1] <= 10 else "")
+        
+        handles = []
+        # Only show legend if we have <= 10 features to avoid clutter
+        if X.shape[1] > 10:
+            handles = [mlines.Line2D([], [], color='black', linewidth=2, 
+                                   label=f'All {X.shape[1]} Features')]
 
     # Add vertical line at optimal alpha
     if optimal_alpha is not None:
-        plt.axvline(x=np.log10(optimal_alpha), color='black', linestyle='--', alpha=0.7,
-                label=f'Optimal α = {optimal_alpha:.3f}')
+        optimal_line = mlines.Line2D([], [], color='black', linestyle='--', 
+                                   label=f'Optimal α = {optimal_alpha:.3f}')
+        handles.append(optimal_line)
+        plt.axvline(x=np.log10(optimal_alpha), color='black', linestyle='--', alpha=0.7)
 
     # Add horizontal line at zero
     plt.axhline(y=0, color='black', linestyle='-', alpha=0.3)
 
     plt.xlabel('Log(α)', fontsize=12)
     plt.ylabel('Coefficients', fontsize=12)
-    plt.title(f'{model_name} Regression: Coefficient Shrinkage Paths', fontsize=14)
+    
+    # Adjust title based on whether we're distinguishing signal features
+    if num_coef is not None:
+        plt.title(f'{model_name} Regression: Coefficient Shrinkage Paths', fontsize=14)
+    else:
+        plt.title(f'{model_name} Regression: Coefficient Shrinkage Paths (All Features)', fontsize=14)
+    
     plt.grid(True, alpha=0.3)
 
-    # Create custom legend
-    import matplotlib.lines as mlines
-    signal_line = mlines.Line2D([], [], color='C0', linewidth=3, label='Signal Features (thick)')
-    noise_line = mlines.Line2D([], [], color='gray', linewidth=1, label='Noise Features (thin)')
-    handles = [signal_line, noise_line]
-    if optimal_alpha is not None:
-        optimal_line = mlines.Line2D([], [], color='black', linestyle='--', label=f'Optimal α = {optimal_alpha:.3f}')
-        handles.append(optimal_line)
-    plt.legend(handles=handles, loc='upper right')
+    # Show legend only if we have handles to display
+    if handles:
+        plt.legend(handles=handles, loc='upper right')
 
     plt.tight_layout()
     plt.show()
