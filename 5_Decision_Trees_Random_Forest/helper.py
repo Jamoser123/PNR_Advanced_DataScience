@@ -3103,7 +3103,7 @@ def plot_random_forest_accuracy(X_train, y_train, X_test, y_test, max_trees=100)
     plt.tight_layout()
     plt.show()
 
-def simple_feature_importance(X, tree):
+def simple_feature_importance(X, tree, title='Feature Importance in Heart Disease Prediction'):
     """
     Displays and visualizes the feature importances from a fitted decision tree model.
     Args:
@@ -3127,7 +3127,7 @@ def simple_feature_importance(X, tree):
     # Visualize feature importance
     plt.figure(figsize=(10, 6))
     sns.barplot(data=feature_importance, x='importance', y='feature', palette='viridis')
-    plt.title('Feature Importance in Heart Disease Prediction')
+    plt.title(title)
     plt.xlabel('Importance Score')
     plt.tight_layout()
     plt.show()
