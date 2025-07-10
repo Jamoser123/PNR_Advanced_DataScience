@@ -3107,7 +3107,7 @@ def plot_random_forest_accuracy(X_train, y_train, X_test, y_test, max_trees=100)
     plt.tight_layout()
     plt.show()
 
-def simple_feature_importance(X, tree):
+def simple_feature_importance(X, tree, title='Feature Importance in Heart Disease Prediction'):
     """
     Displays and visualizes the feature importances from a fitted decision tree model.
     Args:
@@ -3131,7 +3131,7 @@ def simple_feature_importance(X, tree):
     # Visualize feature importance
     plt.figure(figsize=(10, 6))
     sns.barplot(data=feature_importance, x='importance', y='feature', palette='viridis')
-    plt.title('Feature Importance in Heart Disease Prediction')
+    plt.title(title)
     plt.xlabel('Importance Score')
     plt.tight_layout()
     plt.show()
@@ -3723,6 +3723,13 @@ def evaluateModel(X, y, model, model_name='Logistic Regression', ax=None):
         plt.tight_layout()
         plt.show()
 
+
+
+from sklearn.calibration import cross_val_predict
+from sklearn.metrics import auc, roc_curve
+from sklearn.model_selection import cross_validate
+
+
 def evaluate_roc(X, y, model=None, model_name=None, models=None, model_names=None, ax=None):
     """
     Plots ROC curves and evaluates ROC-AUC performance for one or multiple classification models using cross-validation.
@@ -3773,18 +3780,25 @@ def evaluate_roc(X, y, model=None, model_name=None, models=None, model_names=Non
     # Store results for reporting
     all_results = {}
     
-    # Process each model
     for i, (model, name) in enumerate(zip(models, model_names)):
-        # Get probability predictions using cross-validation
-        y_proba = cross_val_predict(model, X, y, cv=5, method='predict_proba')
-        
+        # Try to use predict_proba, else use decision_function
+        if hasattr(model, "predict_proba"):
+            y_score = cross_val_predict(model, X, y, cv=5, method='predict_proba')[:, 1]
+        elif hasattr(model, "decision_function"):
+            y_score = cross_val_predict(model, X, y, cv=5, method='decision_function')
+            # If output is 2D, use the positive class column
+            if y_score.ndim > 1 and y_score.shape[1] == 2:
+                y_score = y_score[:, 1]
+        else:
+            raise ValueError(f"Model {name} does not support probability or decision_function output.")
+
         # Calculate ROC curve
-        fpr, tpr, thresholds = roc_curve(y, y_proba[:, 1])
+        fpr, tpr, thresholds = roc_curve(y, y_score)
         roc_auc = auc(fpr, tpr)
-        
+
         # Also get AUC scores from cross-validation
         auc_scores = cross_validate(model, X, y, cv=5, scoring='roc_auc')['test_score']
-        
+
         # Store results
         all_results[name] = {
             'cv_auc_mean': auc_scores.mean(),
@@ -3793,7 +3807,7 @@ def evaluate_roc(X, y, model=None, model_name=None, models=None, model_names=Non
             'fpr': fpr,
             'tpr': tpr
         }
-        
+
         # Plot ROC curve
         color = colors[i % len(colors)]
         ax.plot(fpr, tpr, color=color, lw=2, 
@@ -3834,6 +3848,7 @@ def evaluate_roc(X, y, model=None, model_name=None, models=None, model_names=Non
     
     # return all_results
 
+# TODO: Maybe improve layout of this function
 def evaluate_confusion_matrix(X, y, model, model_name='Logistic Regression', ax=None):
     """
     Evaluates and visualizes the confusion matrix for a classification model using cross-validation.
@@ -4219,3 +4234,34 @@ def calculate_results_svm(X, y, svm_model, C_val):
         'margin': margin,
         'n_support_vectors': len(svm_model.support_)
     }
+
+def coef_feature_importance(X, model, title='SVM Feature Importance', ax=None):
+    """
+    Displays and visualizes feature importance for a linear SVM model.
+    Args:
+        X (pd.DataFrame): Feature set used to train the SVM.
+        model (sklearn.svm.SVC or LinearSVC): Fitted linear SVM model.
+        title (str): Plot title.
+        ax (matplotlib.axes.Axes, optional): Subplot to plot into. If None, creates a new figure.
+    """
+    if not hasattr(model, "coef_"):
+        raise AttributeError("SVM model must be linear and fitted (have .coef_ attribute).")
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    coefs = model.coef_[0]
+    feature_importance = pd.DataFrame({
+        'feature': X.columns,
+        'importance': abs(coefs)
+    }).sort_values('importance', ascending=False)
+
+    if ax is None:
+        plt.figure(figsize=(10, 6))
+        ax = plt.gca()
+    sns.barplot(data=feature_importance, x='importance', y='feature', palette='viridis', ax=ax)
+    ax.set_title(title)
+    ax.set_xlabel('Absolute Coefficient')
+    plt.tight_layout()
+    if ax is None or not plt.get_fignums():
+        plt.show()
