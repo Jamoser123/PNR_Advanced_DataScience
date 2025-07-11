@@ -5059,7 +5059,7 @@ def plot_training_loss(losses, test_losses=None, epochs_to_show=None, title='Neu
     if test_losses is not None:
         plt.plot(range(len(test_losses)), test_losses, 'r--', linewidth=2, label='Test Loss')
     plt.xlabel('Epoch', fontsize=14)
-    plt.ylabel('Loss (Binary Cross-Entropy)', fontsize=14)
+    plt.ylabel('Loss', fontsize=14)
     plt.title(title, fontsize=16, fontweight='bold')
     plt.grid(True, alpha=0.3)
     plt.legend(fontsize=12)
@@ -5299,9 +5299,10 @@ class SimpleCNN(nn.Module):
     def _calculate_conv_output_size(self):
         """Calculate the output size after all conv and pooling layers"""
         with torch.no_grad():
-            # Create a dummy input to calculate output size
-            dummy_input = torch.zeros(1, 1 if not hasattr(self, 'input_channels') else self.input_channels, 
-                                    self.input_height, self.input_width)
+            # Use instance attributes for dummy input
+            dummy_input = torch.zeros(
+                1, self.input_channels, self.input_height, self.input_width
+            )
             
             x = dummy_input
             for i in range(self.num_conv_layers):
@@ -5469,7 +5470,7 @@ def visualize_cnn_representations(model, X_test_tensor, y_test_tensor, num_sampl
     """
     # Use a subset of test data for visualization (500 samples for speed)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    n_samples = 500
+    n_samples = min(num_samples, len(X_test_tensor))
     indices = np.random.choice(len(X_test_tensor), n_samples, replace=False)
     sample_data = X_test_tensor[indices].to(device)
     sample_labels = y_test_tensor[indices].cpu().numpy()
@@ -5617,6 +5618,9 @@ def prepare_data_for_mlp(X, y, scale_target=True):
         target_scaler = StandardScaler()
         y_train_scaled = target_scaler.fit_transform(y_train.values.reshape(-1, 1)).flatten()
         y_test_scaled = target_scaler.transform(y_test.values.reshape(-1, 1)).flatten()
+        print(f"\nTarget scaling completed")
+        print(f"Original y_train range: [{y_train.min():.1f}, {y_train.max():.1f}]")
+        print(f"Scaled y_train range: [{y_train_scaled.min():.3f}, {y_train_scaled.max():.3f}]")
     else:
         y_train_scaled = y_train.values
         y_test_scaled = y_test.values
@@ -5624,10 +5628,6 @@ def prepare_data_for_mlp(X, y, scale_target=True):
     print(f"\nFeature scaling completed")
     print(f"Training features mean: {X_train_scaled.mean():.3f}")
     print(f"Training features std: {X_train_scaled.std():.3f}")
-
-    print(f"\nTarget scaling completed")
-    print(f"Original y_train range: [{y_train.min():.1f}, {y_train.max():.1f}]")
-    print(f"Scaled y_train range: [{y_train_scaled.min():.3f}, {y_train_scaled.max():.3f}]")
 
     # Convert to PyTorch tensors
     X_train_tensor = torch.FloatTensor(X_train_scaled)
