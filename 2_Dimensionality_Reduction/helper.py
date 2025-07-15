@@ -1024,29 +1024,26 @@ def visualize_features(data, features, outcome_col, outcome_names, title="Featur
     plt.suptitle("Feature Distributions", fontsize=16, y=1.05)
     plt.show()
 
-def plot_similarity_matrices(X, y, datatype='continuous', suptitle=""):
+def plot_similarity_matrices(similarity_matrices, y, titles, suptitle=""):
     """
-    Plots similarity (distance) matrices for selected samples from each category in the dataset.
-    Depending on the datatype, computes and visualizes different distance/similarity matrices
-    (Euclidean, Manhattan, Simple Matching, Jaccard, Hamming, or Gower) for a subset of samples
-    (default: 5 per category) from the input data. The resulting matrices are displayed as heatmaps.
+    Plots one or more similarity (distance) matrices for selected samples across categories.
     Args:
-        X (np.ndarray or pd.DataFrame): The input data matrix of shape (n_samples, n_features).
-        y (np.ndarray or pd.Series or None): The labels or categories for each sample. If None,
-            all samples are treated as belonging to a single category.
-        datatype (str, optional): The type of data. Must be one of 'continuous', 'categorical', or 'mixed'.
-            Determines which similarity/distance metrics are computed. Defaults to 'continuous'.
-        suptitle (str, optional): The overall title for the plot. Defaults to an empty string.
+        similarity_matrices (list or np.ndarray): A list of similarity matrices (2D numpy arrays) or a single matrix.
+        y (np.ndarray or None): Array of category labels for each sample. If None, defaults to a single category.
+        titles (list of str): Titles for each similarity matrix plot.
+        suptitle (str, optional): Super title for the entire figure. Defaults to "".
     Returns:
-        None: This function displays the plots and does not return any value.
+        None: Displays the similarity matrix plots using matplotlib.
     Raises:
-        ValueError: If `datatype` is not one of 'continuous', 'categorical', or 'mixed'.
+        ValueError: If the number of titles does not match the number of similarity matrices.
     Notes:
-        - For each unique category in `y`, up to 5 samples are selected for visualization.
-        - Requires external functions: `pairwise_distances`, `simple_matching_distance`,
-          `pairwise_hamming_distance_similarity`, and `gower.gower_matrix`.
-        - Uses matplotlib for plotting.
+        - For each unique category in `y`, the function selects the first 5 samples.
+        - The similarity matrices are subsetted to only include these selected samples.
+        - If multiple matrices are provided, they are plotted side by side for comparison.
     """
+
+    if not isinstance(similarity_matrices, list):
+        similarity_matrices = [similarity_matrices]
     
     if y is None:
         y = np.zeros(X.shape[0])  # Default to a single category if no labels are provided
@@ -1065,34 +1062,14 @@ def plot_similarity_matrices(X, y, datatype='continuous', suptitle=""):
         selected_indices.extend(category_indices)
 
     # Create labels for the plot
-    labels = [f"{'C' if len(cat) == 1 else ''}{cat} {i+1}" for cat in unique_categories for i in range(n_samples_per_category)]
-
-    if datatype == 'continuous':
-        # Compute the full distance matrices
-        euclidean_dist = pairwise_distances(X, metric='euclidean')
-        manhattan_dist = pairwise_distances(X, metric='manhattan')
-
-        similarity_matrices = [euclidean_dist, manhattan_dist]
-        titles = ["Euclidean Distance (5 for each category)", "Manhattan Distance (5 for each category)"]
-    
-    elif datatype == 'categorical':
-        # Compute simple matching distance for categorical data
-        smd = simple_matching_distance(X)
-        jaccard_dist = pairwise_distances(X, metric='jaccard')
-        hamming_dist = pairwise_hamming_distance_similarity(X)
-        similarity_matrices = [smd, jaccard_dist, hamming_dist]
-
-        titles = ["Simple Matching Distance (5 for each category)", "Jaccard Distance (5 for each category)", "Hamming Distance (5 for each category)"]
-
-    elif datatype == 'mixed':
-        # Compute Gower distance for mixed data types
-        gower_dist = gower.gower_matrix(X)
-        similarity_matrices = [gower_dist]
-
-        titles = ["Gower Distance (5 for each category)"]
-
-
-    similarity_selected = [mat[np.ix_(selected_indices, selected_indices)] for mat in similarity_matrices]
+    # In the helper.py file, replace the problematic section with:
+    labels = []
+    for cat in unique_categories:
+        cat_str = str(cat)
+        prefix = 'C' if len(cat_str) == 1 else ''
+        for i in range(n_samples_per_category):
+            labels.append(f"{prefix}{cat_str} {i+1}")
+        similarity_selected = [mat[np.ix_(selected_indices, selected_indices)] for mat in similarity_matrices]
 
 
     # Plot the similarity (distance) matrices
