@@ -8,9 +8,9 @@ from sklearn import cluster
 
 from IPython.display import display, HTML
 
-from sklearn.calibration import cross_val_predict
+from sklearn.calibration import LabelEncoder, cross_val_predict
 from sklearn.manifold import MDS
-from sklearn.metrics import ConfusionMatrixDisplay, accuracy_score, auc, confusion_matrix, f1_score, make_scorer, precision_score, r2_score, recall_score, roc_curve
+from sklearn.metrics import ConfusionMatrixDisplay, accuracy_score, auc, classification_report, confusion_matrix, f1_score, make_scorer, precision_score, r2_score, recall_score, roc_curve
 from sklearn.decomposition import PCA
 from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor, RandomForestClassifier, RandomForestRegressor
 from sklearn.inspection import PartialDependenceDisplay
@@ -4740,6 +4740,111 @@ def visualize_decision_boundary(model, X, y):
     plt.axis('equal')
     plt.show()
 
+# TODO: Add the possibility to define Layer keys and titles for custom plotting of intermediate representations
+def visualize_model_representations(model, X_test_tensor, y_test_tensor, model_type='cnn', num_samples=500):
+    """
+    Visualizes the internal representations of a CNN or MLP model at different layers using MDS.
+    
+    Args:
+        model: The trained model with a `get_representations` method
+        X_test_tensor (torch.Tensor): Test set input data as a tensor
+        y_test_tensor (torch.Tensor): Test set labels as a tensor
+        model_type (str): Either 'cnn' or 'mlp' to determine which representations to extract
+        num_samples (int, optional): Number of test samples to use for visualization. Defaults to 500.
+    
+    Returns:
+        None. Displays a matplotlib figure with subplots visualizing the 2D embeddings.
+    """
+    # Use a subset of test data for visualization
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    n_samples = min(num_samples, len(X_test_tensor))
+    indices = np.random.choice(len(X_test_tensor), n_samples, replace=False)
+    sample_data = X_test_tensor[indices].to(device)
+    sample_labels = y_test_tensor[indices].cpu().numpy()
+
+    # Ensure sample_labels is 1D
+    if sample_labels.ndim > 1:
+        sample_labels = sample_labels.flatten()
+        
+    # Get representations
+    representations = model.get_representations(sample_data)
+    
+    # Define layer configurations based on model type
+    if model_type.lower() == 'cnn':
+        layer_keys = ['flattened', 'fc1', 'fc2', 'output']
+        layer_titles = [
+            'Flattened Conv Features\n(Raw Conv Output)',
+            'FC1 Layer Representations\n(Intermediate Features)', 
+            'FC2 Layer Representations\n(Second Intermediate Features)',
+            'Output Layer\n(Pre-Softmax Logits)'
+        ]
+        fig_title = 'CNN Layer Representations'
+        label_prefix = 'Class'
+    else:  # mlp
+        layer_keys = ['input', 'hidden1', 'hidden2', 'output']
+        layer_titles = [
+            'Input Layer\n(Raw Input Features)',
+            'Hidden Layer 1\n(First Transformation)',
+            'Hidden Layer 2\n(Second Transformation)', 
+            'Output Layer\n(Pre-Softmax Logits)'
+        ]
+        fig_title = 'MLP Layer Representations'
+        label_prefix = 'Class'
+
+    print(f"Analyzing {n_samples} test samples")
+    for i, key in enumerate(layer_keys):
+        if key in representations:
+            print(f"{layer_titles[i].split('(')[0].strip()}: {representations[key].shape}")
+
+    # Create subplots
+    fig, axes = plt.subplots(1, 4, figsize=(24, 6))
+    
+    # Get unique labels and colors
+    unique_labels = np.unique(sample_labels)
+    colors = plt.cm.tab10(np.arange(len(unique_labels)))
+
+    # Process each layer
+    for i, (key, title) in enumerate(zip(layer_keys, layer_titles)):
+        if key not in representations:
+            axes[i].text(0.5, 0.5, f'{key} not available', 
+                        ha='center', va='center', transform=axes[i].transAxes)
+            axes[i].set_title(title, fontsize=12, fontweight='bold')
+            continue
+            
+        # Standardize and apply MDS
+        scaler = StandardScaler()
+        scaled_data = scaler.fit_transform(representations[key])
+        
+        if scaled_data.shape[1] > 2:
+            mds = MDS(n_components=2, random_state=42, normalized_stress='auto')
+            data_2d = mds.fit_transform(scaled_data)
+            dimension_info = f"({scaled_data.shape[1]}D → 2D via MDS)"
+        else:
+            data_2d = scaled_data
+            dimension_info = f"({scaled_data.shape[1]}D)"
+        
+        # Plot each class
+        for j, label in enumerate(unique_labels):
+            mask = sample_labels == label
+            if np.any(mask):
+                axes[i].scatter(data_2d[mask, 0], data_2d[mask, 1], 
+                              c=[colors[j]], s=20, alpha=0.6, 
+                              label=f'{label_prefix} {label}')
+
+        axes[i].set_xlabel('Dimension 1', fontsize=10)
+        axes[i].set_ylabel('Dimension 2', fontsize=10)
+        axes[i].set_title(f'{title}\n{dimension_info}', 
+                         fontsize=12, fontweight='bold')
+        axes[i].grid(True, alpha=0.3)
+        
+        # Add legend only to first subplot
+        if i == 0:
+            axes[i].legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    plt.suptitle(f'{fig_title} - Layer Transformations', fontsize=16, fontweight='bold')
+    plt.tight_layout()
+    plt.show()
+
 def visualize_layer_transformations(model, X, y, n_samples=500):
     """
     Visualizes how data representations change as they pass through the layers of a neural network.
@@ -5256,6 +5361,7 @@ class SimpleCNN(nn.Module):
                  input_height=28, input_width=28):
         super(SimpleCNN, self).__init__()
         
+        self.input_channels = input_channels
         self.num_conv_layers = num_conv_layers
         self.num_fc_layers = num_fc_layers
         self.input_height = input_height
@@ -5552,94 +5658,97 @@ def visualize_cnn_representations(model, X_test_tensor, y_test_tensor, num_sampl
     plt.tight_layout()
     plt.show()
 
-def get_sample(dataset, label_names=None):
+def get_sample(X, y, label_names):
     """
-    Randomly selects a sample from the dataset and returns the image tensor (as a batch) and a title string.
+    Randomly selects a sample from tensors and returns the image tensor (as a batch) and a title string.
     Args:
-        dataset: A dataset object supporting indexing, where each item is a tuple (image_tensor, labels).
-        label_names (list of str, optional): List of label names corresponding to the indices in the labels tensor.
-            If provided, the function will generate a human-readable title based on active labels.
+        X (torch.Tensor): Input tensor of shape (n_samples, channels, height, width) or (n_samples, features).
+        y (torch.Tensor): Labels tensor of shape (n_samples,) or (n_samples, n_labels).
+        label_names (dict or list): Maps label indices to label names.
     Returns:
         tuple:
             image_batch (torch.Tensor): The selected image tensor with an added batch dimension.
-            title (str): A string representing the active labels or the raw labels if label_names is not provided.
+            title (str): A string representing the labels.
     """
-    idx = random.randint(0, len(dataset) - 1)
+    # Random sample
+    idx = random.randint(0, len(X) - 1)
+    image_tensor = X[idx]
+    labels = y[idx]
     
-    image_tensor, labels = dataset[idx]
-    image_batch = image_tensor.unsqueeze(0)
-        
-    if label_names is not None:
-        # Ensure label_names is a list of strings
-        active_conditions = [label_names[i] for i, val in enumerate(labels) if val == 1]
-        title = ', '.join(active_conditions) if active_conditions else 'Normal'
+    # Add batch dimension if needed
+    if image_tensor.dim() == 3:  # (C, H, W) -> (1, C, H, W)
+        image_batch = image_tensor.unsqueeze(0)
+    elif image_tensor.dim() == 1:  # (features,) -> (1, features)
+        image_batch = image_tensor.unsqueeze(0)
     else:
-        title = str(labels)
+        image_batch = image_tensor
+    
+    # Generate title
+    if isinstance(label_names, dict):
+        if labels.dim() > 0 and len(labels) > 1:  # Multi-label
+            active_conditions = [label_names[i] for i, val in enumerate(labels) if val == 1]
+            title = ', '.join(active_conditions) if active_conditions else 'Normal'
+        else:  # Single label
+            label_idx = int(labels.item()) if isinstance(labels, torch.Tensor) else int(labels)
+            title = label_names.get(label_idx, f'Class {label_idx}')
+    elif isinstance(label_names, list):  # Single-label case
+        label_idx = int(labels.item()) if isinstance(labels, torch.Tensor) else int(labels)
+        title = label_names[label_idx] if 0 <= label_idx < len(label_names) else f'Class {label_idx}'
+    else:
+        title = str(labels.tolist() if isinstance(labels, torch.Tensor) else labels)
     
     return image_batch, title
 
-def prepare_data_for_mlp(X, y, scale_target=True):
+def prepare_data_for_mlp(X, y, task_type="regression", scale_target=True):
     """
     Prepares data for training a Multi-Layer Perceptron (MLP) by splitting, scaling, and converting to PyTorch tensors.
-    This function splits the input features and targets into training and testing sets, scales the features (and optionally the targets),
-    and converts the resulting arrays into PyTorch FloatTensors suitable for use in neural network models.
+    Supports both regression and classification tasks.
+
     Args:
         X (pd.DataFrame or np.ndarray): Feature matrix of shape (n_samples, n_features).
         y (pd.Series or np.ndarray): Target vector of shape (n_samples,).
-        scale_target (bool, optional): Whether to scale the target variable using StandardScaler. Defaults to True.
+        task_type (str): "regression" or "classification".
+        scale_target (bool, optional): Whether to scale the target variable (only for regression). Defaults to True.
+
     Returns:
-        tuple: A tuple containing:
-            - X_train_tensor (torch.FloatTensor): Scaled training features tensor.
-            - y_train_tensor (torch.FloatTensor): Scaled training targets tensor.
-            - X_test_tensor (torch.FloatTensor): Scaled testing features tensor.
-            - y_test_tensor (torch.FloatTensor): Scaled testing targets tensor.
-    Raises:
-        ValueError: If the input shapes are incompatible or if required libraries are not imported.
-    Notes:
-        - Feature scaling is crucial for neural network training stability.
-        - Target scaling is recommended for regression tasks.
-        - The function prints information about the data split, scaling, and tensor shapes for debugging purposes.
+        tuple: (X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor)
     """
-    # Split the data into training and testing sets
+    # Split the data
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
     )
 
-    print(f"Training set: {X_train.shape[0]} samples")
-    print(f"Test set: {X_test.shape[0]} samples")
-
-    # Scale the features (important for neural networks)
+    # Scale features
     feature_scaler = StandardScaler()
     X_train_scaled = feature_scaler.fit_transform(X_train)
     X_test_scaled = feature_scaler.transform(X_test)
 
-    # Scale the targets too (crucial for regression)
-    if scale_target:
-        target_scaler = StandardScaler()
-        y_train_scaled = target_scaler.fit_transform(y_train.values.reshape(-1, 1)).flatten()
-        y_test_scaled = target_scaler.transform(y_test.values.reshape(-1, 1)).flatten()
-        print(f"\nTarget scaling completed")
-        print(f"Original y_train range: [{y_train.min():.1f}, {y_train.max():.1f}]")
-        print(f"Scaled y_train range: [{y_train_scaled.min():.3f}, {y_train_scaled.max():.3f}]")
+    # Prepare targets
+    if task_type == "classification":
+        # Encode labels as integers
+        label_encoder = LabelEncoder()
+        y_train_encoded = label_encoder.fit_transform(y_train)
+        y_test_encoded = label_encoder.transform(y_test)
+        y_train_tensor = torch.LongTensor(y_train_encoded)
+        y_test_tensor = torch.LongTensor(y_test_encoded)
     else:
-        y_train_scaled = y_train.values
-        y_test_scaled = y_test.values
+        # Regression: scale targets if requested
+        if scale_target:
+            target_scaler = StandardScaler()
+            y_train_scaled = target_scaler.fit_transform(y_train.values.reshape(-1, 1)).flatten()
+            y_test_scaled = target_scaler.transform(y_test.values.reshape(-1, 1)).flatten()
+        else:
+            y_train_scaled = y_train.values
+            y_test_scaled = y_test.values
+        y_train_tensor = torch.FloatTensor(y_train_scaled).reshape(-1, 1)
+        y_test_tensor = torch.FloatTensor(y_test_scaled).reshape(-1, 1)
 
-    print(f"\nFeature scaling completed")
-    print(f"Training features mean: {X_train_scaled.mean():.3f}")
-    print(f"Training features std: {X_train_scaled.std():.3f}")
-
-    # Convert to PyTorch tensors
+    # Convert features to tensors
     X_train_tensor = torch.FloatTensor(X_train_scaled)
     X_test_tensor = torch.FloatTensor(X_test_scaled)
-    y_train_tensor = torch.FloatTensor(y_train_scaled).reshape(-1, 1)
-    y_test_tensor = torch.FloatTensor(y_test_scaled).reshape(-1, 1)
 
-    print(f"\nTensor shapes:")
-    print(f"X_train: {X_train_tensor.shape}")
-    print(f"y_train: {y_train_tensor.shape}")
-    print(f"X_test: {X_test_tensor.shape}")
-    print(f"y_test: {y_test_tensor.shape}")
+    print(f"X_train: {X_train_tensor.shape}, y_train: {y_train_tensor.shape}")
+    print(f"X_test: {X_test_tensor.shape}, y_test: {y_test_tensor.shape}")
 
     return X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor
 
@@ -5754,6 +5863,7 @@ def train_model(model, X_train_tensor, y_train_tensor, X_test_tensor, y_test_ten
     
     # Setup optimizer
     optimizer = optim.SGD(model.parameters(), lr=learning_rate)
+    # optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     
     # Create data loader
     train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
@@ -6019,7 +6129,9 @@ def loadChestMNIST(train_subset_size=800, test_subset_size=200, transform=None):
     print("Loading ChestMNIST dataset...")
     # Add transforms to convert PIL images to tensors
     from torchvision import transforms
+    show_imgs = False
     if transform is None:
+        show_imgs = True
         transform = transforms.Compose([transforms.ToTensor()])
     
     train_dataset = ChestMNIST(split='train', download=True, transform=transform)
@@ -6058,42 +6170,669 @@ def loadChestMNIST(train_subset_size=800, test_subset_size=200, transform=None):
         13: "hernia"
     }
 
-    # Display sample images
-    fig, axes = plt.subplots(2, 5, figsize=(15, 6))
-    axes = axes.ravel()
+    if show_imgs:
+        # Display sample images
+        fig, axes = plt.subplots(2, 5, figsize=(15, 6))
+        axes = axes.ravel()
 
-    for i in range(10):
-        # Get random sample from subset
-        idx = train_subset_indices[i]
-        image, label = train_dataset[idx]
-        
-        # Handle different image formats
-        if isinstance(image, torch.Tensor):
-            if image.shape[0] == 3:  # RGB tensor (3, H, W)
-                # Convert from (C, H, W) to (H, W, C) for matplotlib
-                image_np = image.permute(1, 2, 0).numpy()
-                # Denormalize if needed (assuming ImageNet normalization)
-                if image_np.min() < 0:  # Likely normalized
-                    mean = np.array([0.485, 0.456, 0.406])
-                    std = np.array([0.229, 0.224, 0.225])
-                    image_np = image_np * std + mean
-                    image_np = np.clip(image_np, 0, 1)
-                axes[i].imshow(image_np)
-            else:  # Grayscale tensor (1, H, W) or (H, W)
-                image_np = image.squeeze().numpy()
-                axes[i].imshow(image_np, cmap='gray')
-        else:
-            # Handle PIL Image case
-            axes[i].imshow(image, cmap='gray')
-        
-        # Convert multi-label to readable format
-        active_labels = [label_names[j] for j, val in enumerate(label) if val == 1]
-        title = ', '.join(active_labels) if active_labels else 'Normal'
-        axes[i].set_title(title, fontsize=8)
-        axes[i].axis('off')
+        for i in range(10):
+            # Get random sample from subset
+            idx = train_subset_indices[i]
+            image, label = train_dataset[idx]
+            
+            # Handle different image formats
+            if isinstance(image, torch.Tensor):
+                if image.shape[0] == 3:  # RGB tensor (3, H, W)
+                    # Convert from (C, H, W) to (H, W, C) for matplotlib
+                    image_np = image.permute(1, 2, 0).numpy()
+                    # Denormalize if needed (assuming ImageNet normalization)
+                    if image_np.min() < 0:  # Likely normalized
+                        mean = np.array([0.485, 0.456, 0.406])
+                        std = np.array([0.229, 0.224, 0.225])
+                        image_np = image_np * std + mean
+                        image_np = np.clip(image_np, 0, 1)
+                    axes[i].imshow(image_np)
+                else:  # Grayscale tensor (1, H, W) or (H, W)
+                    image_np = image.squeeze().numpy()
+                    axes[i].imshow(image_np, cmap='gray')
+            else:
+                # Handle PIL Image case
+                axes[i].imshow(image, cmap='gray')
+            
+            # Convert multi-label to readable format
+            active_labels = [label_names[j] for j, val in enumerate(label) if val == 1]
+            title = ', '.join(active_labels) if active_labels else 'Normal'
+            axes[i].set_title(title, fontsize=8)
+            axes[i].axis('off')
 
-    plt.suptitle('Sample Chest X-ray Images from ChestMNIST', fontsize=14)
+        plt.suptitle('Sample Chest X-ray Images from ChestMNIST', fontsize=14)
+        plt.tight_layout()
+        plt.show()
+
+    X_train = torch.stack([train_subset[i][0] for i in range(len(train_subset))])
+    y_train = torch.tensor([train_subset[i][1] for i in range(len(train_subset))])
+
+    X_test = torch.stack([test_subset[i][0] for i in range(len(test_subset))])
+    y_test = torch.tensor([test_subset[i][1] for i in range(len(test_subset))])
+
+    return X_train, y_train, X_test, y_test, label_names
+
+def loadPneumoniaMNIST(train_subset_size=800, test_subset_size=200, transform=None):
+    """
+    Loads the PneumoniaMNIST dataset, creates random subsets for training and testing, and displays sample images.
+    Args:
+        train_subset_size (int, optional): Number of images to include in the training subset. Defaults to 800.
+        test_subset_size (int, optional): Number of images to include in the test subset. Defaults to 200.
+        transform (callable, optional): Optional transform to be applied on a sample. If None, defaults to converting images to tensors.
+    Returns:
+        tuple: 
+            - X_train (torch.Tensor): Training images tensor.
+            - y_train (torch.Tensor): Training labels tensor.
+            - X_test (torch.Tensor): Test images tensor.
+            - y_test (torch.Tensor): Test labels tensor.
+            - label_names (dict): Dictionary mapping label indices to label names.
+    Displays:
+        A matplotlib figure showing 10 sample images from the training subset with their corresponding labels.
+    """
+    # Load PneumoniaMNIST dataset
+    print("Loading PneumoniaMNIST dataset...")
+    # Add transforms to convert PIL images to tensors
+    from torchvision import transforms
+    from medmnist import PneumoniaMNIST  # Import PneumoniaMNIST instead of ChestMNIST
+    
+    show_imgs = False
+    if transform is None:
+        show_imgs = True
+        transform = transforms.Compose([transforms.ToTensor()])
+    
+    train_dataset = PneumoniaMNIST(split='train', download=True, transform=transform)
+    test_dataset = PneumoniaMNIST(split='test', download=True, transform=transform)
+
+    print(f"Full dataset sizes:")
+    print(f"Training: {len(train_dataset)} images")
+    print(f"Test: {len(test_dataset)} images")
+
+    # Create subset of training images
+    train_subset_indices = random.sample(range(len(train_dataset)), train_subset_size)
+    train_subset = Subset(train_dataset, train_subset_indices)
+
+    # Create subset of test images
+    test_subset_indices = random.sample(range(len(test_dataset)), test_subset_size)
+    test_subset = Subset(test_dataset, test_subset_indices)
+
+    print(f"\nUsing subset of {len(train_subset)} training images")
+    print(f"Test set: {len(test_subset)} images")
+
+    # Get label names for PneumoniaMNIST (binary classification)
+    label_names = {
+        0: "Normal",
+        1: "Pneumonia"
+    }
+
+    if show_imgs:
+        # Display sample images
+        fig, axes = plt.subplots(2, 5, figsize=(15, 6))
+        axes = axes.ravel()
+
+        for i in range(10):
+            # Get random sample from subset
+            idx = train_subset_indices[i]
+            image, label = train_dataset[idx]
+            
+            # Handle different image formats
+            if isinstance(image, torch.Tensor):
+                if image.shape[0] == 3:  # RGB tensor (3, H, W)
+                    # Convert from (C, H, W) to (H, W, C) for matplotlib
+                    image_np = image.permute(1, 2, 0).numpy()
+                    # Denormalize if needed (assuming ImageNet normalization)
+                    if image_np.min() < 0:  # Likely normalized
+                        mean = np.array([0.485, 0.456, 0.406])
+                        std = np.array([0.229, 0.224, 0.225])
+                        image_np = image_np * std + mean
+                        image_np = np.clip(image_np, 0, 1)
+                    axes[i].imshow(image_np)
+                else:  # Grayscale tensor (1, H, W) or (H, W)
+                    image_np = image.squeeze().numpy()
+                    axes[i].imshow(image_np, cmap='gray')
+            else:
+                # Handle PIL Image case
+                axes[i].imshow(image, cmap='gray')
+            
+            # Convert single-label to readable format (PneumoniaMNIST is binary classification)
+            if isinstance(label, torch.Tensor):
+                label_idx = int(label.item())
+            else:
+                # Ensure label_idx is an int, not a numpy array
+                if isinstance(label, (list, tuple, np.ndarray)):
+                    label_idx = int(label[0])
+                else:
+                    label_idx = int(label)
+
+            title = label_names.get(label_idx, f'Class {label_idx}')
+            axes[i].set_title(title, fontsize=8)
+            axes[i].axis('off')
+
+        plt.suptitle('Sample Chest X-ray Images from PneumoniaMNIST', fontsize=14)
+        plt.tight_layout()
+        plt.show()
+
+    X_train = torch.stack([train_subset[i][0] for i in range(len(train_subset))])
+    y_train = torch.tensor([train_subset[i][1] for i in range(len(train_subset))])
+
+    X_test = torch.stack([test_subset[i][0] for i in range(len(test_subset))])
+    y_test = torch.tensor([test_subset[i][1] for i in range(len(test_subset))])
+
+    return X_train, y_train, X_test, y_test, label_names
+
+# Split the data first
+def prepare_data_for_textAnalysis(X, y, tokenizer):
+    train_texts, val_texts, train_labels, val_labels = train_test_split(
+        X.tolist(),
+        y.tolist(),
+        test_size=0.2,
+        random_state=42,
+        stratify=y
+    )
+
+    print(f"Training samples: {len(train_texts)}")
+    print(f"Validation samples: {len(val_texts)}")
+    print(f"Train labels: {np.bincount(train_labels)}")
+    print(f"Val labels: {np.bincount(val_labels)}")
+
+    # Tokenize separately
+    print("Tokenizing training data...")
+    train_encodings = tokenizer(
+        train_texts,
+        truncation=True,
+        padding=True,
+        max_length=512,
+        return_tensors='pt'
+    )
+
+    print("Tokenizing validation data...")
+    val_encodings = tokenizer(
+        val_texts,
+        truncation=True,
+        padding=True,
+        max_length=512,
+        return_tensors='pt'
+    )
+
+    print("Tokenization complete!")
+
+    # Convert labels to tensors
+    train_labels_tensor = torch.tensor(train_labels)
+    val_labels_tensor = torch.tensor(val_labels)
+
+    # Create TensorDatasets
+    train_dataset = TensorDataset(
+        train_encodings['input_ids'],
+        train_encodings['attention_mask'],
+        train_labels_tensor
+    )
+
+    val_dataset = TensorDataset(
+        val_encodings['input_ids'],
+        val_encodings['attention_mask'],
+        val_labels_tensor
+    )
+
+    return train_dataset, val_dataset
+
+from torch.optim import AdamW
+
+def train_language_model(model, train_dataset, val_dataset, epochs=3):
+
+    # Create DataLoaders
+    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=16, shuffle=False)
+
+    print(f"Training batches: {len(train_loader)}")
+    print(f"Validation batches: {len(val_loader)}")
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
+    
+    model.to(device)
+    optimizer = AdamW(model.parameters(), lr=1e-3)
+    
+    train_losses = []
+    val_accuracies = []
+    
+    for epoch in range(epochs):
+        # Training
+        model.train()
+        total_train_loss = 0
+        
+        for batch_idx, batch in enumerate(train_loader):
+            input_ids, attention_mask, labels = [b.to(device) for b in batch]
+            
+            optimizer.zero_grad()
+            
+            labels = labels.float()
+
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+            loss = outputs.loss
+            
+            loss.backward()
+            optimizer.step()
+            
+            total_train_loss += loss.item()
+            
+            if (batch_idx + 1) % 50 == 0:
+                print(f"Epoch {epoch+1}/{epochs}, Batch {batch_idx+1}/{len(train_loader)}, Loss: {loss.item():.4f}")
+        
+        avg_train_loss = total_train_loss / len(train_loader)
+        train_losses.append(avg_train_loss)
+        
+        # Validation
+        model.eval()
+        val_predictions = []
+        val_true_labels = []
+        
+        with torch.no_grad():
+            for batch in val_loader:
+                input_ids, attention_mask, labels = [b.to(device) for b in batch]
+                
+                outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+                logits = outputs.logits
+                
+                predictions = torch.argmax(logits, dim=1)
+                
+                val_predictions.extend(predictions.cpu().numpy())
+                val_true_labels.extend(labels.cpu().numpy())
+        
+        val_accuracy = accuracy_score(val_true_labels, val_predictions)
+        val_accuracies.append(val_accuracy)
+        
+        print(f"Epoch {epoch+1}/{epochs}")
+        print(f"  Train Loss: {avg_train_loss:.4f}")
+        print(f"  Val Accuracy: {val_accuracy:.4f}")
+        print("-" * 50)
+    
+    return model, train_losses, val_accuracies, val_predictions, val_true_labels
+
+def evaluate_language_model(model, dataset, target_names=['Negative', 'Positive']):
+    """
+    Evaluates a sentiment analysis model on a dataset and displays the results.
+    
+    Args:
+        model: The trained model to evaluate
+        dataset: A TensorDataset containing input_ids, attention_mask, and labels
+        target_names: Names of the classes for the classification report
+    """
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+    
+    # Create DataLoader for the dataset
+    dataloader = DataLoader(dataset, batch_size=16, shuffle=False)
+    
+    # Get predictions
+    model.eval()
+    predictions = []
+    true_labels = []
+    
+    with torch.no_grad():
+        for batch in dataloader:
+            input_ids, attention_mask, labels = [b.to(device) for b in batch]
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            logits = outputs.logits
+            preds = torch.argmax(logits, dim=1)
+            
+            predictions.extend(preds.cpu().numpy())
+            true_labels.extend(labels.cpu().numpy())
+    
+    # Classification report
+    print("Classification Report:")
+    print(classification_report(true_labels, predictions, target_names=target_names))
+    
+    # Confusion matrix
+    cm = confusion_matrix(true_labels, predictions)
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                xticklabels=target_names, yticklabels=target_names)
+    plt.title('Confusion Matrix')
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
     plt.tight_layout()
     plt.show()
+    
+    return predictions, true_labels
 
-    return train_subset, test_subset, label_names
+def loadDermaMNIST(train_subset_size=800, test_subset_size=200, transform=None):
+    """
+    Loads the DermaMNIST dataset, creates random subsets for training and testing, and displays sample images.
+    Args:
+        train_subset_size (int, optional): Number of images to include in the training subset. Defaults to 800.
+        test_subset_size (int, optional): Number of images to include in the test subset. Defaults to 200.
+        transform (callable, optional): Optional transform to be applied on a sample. If None, defaults to converting images to tensors.
+    Returns:
+        tuple: 
+            - train_subset (torch.utils.data.Subset): Subset of the training dataset.
+            - test_subset (torch.utils.data.Subset): Subset of the test dataset.
+            - label_names (dict): Dictionary mapping label indices to label names.
+    Displays:
+        A matplotlib figure showing 10 sample images from the training subset with their corresponding labels.
+    """
+    # Load DermaMNIST dataset
+    print("Loading DermaMNIST dataset...")
+    # Add transforms to convert PIL images to tensors
+    from torchvision import transforms
+    import random
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from torch.utils.data import Subset
+    from medmnist import DermaMNIST
+    
+    show_imgs = False
+    if transform is None:
+        show_imgs = True
+        transform = transforms.Compose([transforms.ToTensor()])
+    
+    train_dataset = DermaMNIST(split='train', download=True, transform=transform)
+    test_dataset = DermaMNIST(split='test', download=True, transform=transform)
+
+    print(f"Full dataset sizes:")
+    print(f"Training: {len(train_dataset)} images")
+    print(f"Test: {len(test_dataset)} images")
+
+    # Create subset of training images
+    train_subset_indices = random.sample(range(len(train_dataset)), train_subset_size)
+    train_subset = Subset(train_dataset, train_subset_indices)
+
+    # Create subset of test images
+    test_subset_indices = random.sample(range(len(test_dataset)), test_subset_size)
+    test_subset = Subset(test_dataset, test_subset_indices)
+
+    print(f"\nUsing subset of {len(train_subset)} training images")
+    print(f"Test set: {len(test_subset)} images")
+
+    # Get label names from the dataset
+    label_names = {
+        0: "akiec (Actinic keratoses)",
+        1: "bcc (Basal cell carcinoma)", 
+        2: "bkl (Benign keratosis-like lesions)",
+        3: "df (Dermatofibroma)",
+        4: "mel (Melanoma)",
+        5: "nv (Melanocytic nevi)",
+        6: "vasc (Vascular lesions)"
+    }
+
+    if show_imgs:
+        # Display sample images if not transformed
+        fig, axes = plt.subplots(2, 5, figsize=(15, 6))
+        axes = axes.ravel()
+
+        for i in range(10):
+            # Get random sample from subset
+            idx = train_subset_indices[i]
+            image, label = train_dataset[idx]
+            
+            # Handle different image formats
+            if isinstance(image, torch.Tensor):
+                if image.shape[0] == 3:  # RGB tensor (3, H, W)
+                    # Convert from (C, H, W) to (H, W, C) for matplotlib
+                    image_np = image.permute(1, 2, 0).numpy()
+                    axes[i].imshow(image_np)
+                else:  # Grayscale tensor (1, H, W) or (H, W)
+                    image_np = image.squeeze().numpy()
+                    axes[i].imshow(image_np, cmap='gray')
+            else:
+                # Handle PIL Image case
+                axes[i].imshow(image, cmap='gray')
+            
+            # Convert label to readable format (DermaMNIST uses single-label classification)
+            if isinstance(label, torch.Tensor):
+                label_idx = int(label.item())
+            else:
+                # Ensure label_idx is an int, not a numpy array
+                if isinstance(label, (list, tuple, np.ndarray)):
+                    label_idx = int(label[0])
+                else:
+                    label_idx = int(label)
+
+            title = label_names.get(label_idx, f'Class {label_idx}')
+            axes[i].set_title(title, fontsize=8)
+            axes[i].axis('off')
+
+        plt.suptitle('Sample Dermatoscope Images from DermaMNIST', fontsize=14)
+        plt.tight_layout()
+        plt.show()
+
+    X_train = torch.stack([train_subset[i][0] for i in range(len(train_subset))])
+    y_train = torch.tensor([train_subset[i][1] for i in range(len(train_subset))])
+
+    X_test = torch.stack([test_subset[i][0] for i in range(len(test_subset))])
+    y_test = torch.tensor([test_subset[i][1] for i in range(len(test_subset))])
+
+    return X_train, y_train, X_test, y_test, label_names
+
+def prepare_data_for_textAnalysis(X, y, tokenizer):
+    train_texts, val_texts, train_labels, val_labels = train_test_split(
+        X.tolist(),
+        y.tolist(),
+        test_size=0.2,
+        random_state=42,
+        stratify=y
+    )
+
+    print(f"Training samples: {len(train_texts)}")
+    print(f"Validation samples: {len(val_texts)}")
+    print(f"Train labels: {np.bincount(train_labels)}")
+    print(f"Val labels: {np.bincount(val_labels)}")
+
+    # Tokenize separately
+    print("Tokenizing training data...")
+    train_encodings = tokenizer(
+        train_texts,
+        truncation=True,
+        padding=True,
+        max_length=512,
+        return_tensors='pt'
+    )
+
+    print("Tokenizing validation data...")
+    val_encodings = tokenizer(
+        val_texts,
+        truncation=True,
+        padding=True,
+        max_length=512,
+        return_tensors='pt'
+    )
+
+    print("Tokenization complete!")
+
+    # Convert labels to tensors
+    train_labels_tensor = torch.tensor(train_labels)
+    val_labels_tensor = torch.tensor(val_labels)
+
+    # Create TensorDatasets
+    train_dataset = TensorDataset(
+        train_encodings['input_ids'],
+        train_encodings['attention_mask'],
+        train_labels_tensor
+    )
+
+    val_dataset = TensorDataset(
+        val_encodings['input_ids'],
+        val_encodings['attention_mask'],
+        val_labels_tensor
+    )
+
+    return train_dataset, val_dataset
+
+def train_language_model(model, train_dataset, val_dataset, epochs=3):
+
+    # Create DataLoaders
+    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=16, shuffle=False)
+
+    print(f"Training batches: {len(train_loader)}")
+    print(f"Validation batches: {len(val_loader)}")
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
+    
+    model.to(device)
+    optimizer = AdamW(model.parameters(), lr=1e-3)
+    
+    train_losses = []
+    val_accuracies = []
+    
+    for epoch in range(epochs):
+        # Training
+        model.train()
+        total_train_loss = 0
+        
+        for batch_idx, batch in enumerate(train_loader):
+            input_ids, attention_mask, labels = [b.to(device) for b in batch]
+            
+            optimizer.zero_grad()
+            
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+            loss = outputs.loss
+            
+            loss.backward()
+            optimizer.step()
+            
+            total_train_loss += loss.item()
+            
+            if (batch_idx + 1) % 50 == 0:
+                print(f"Epoch {epoch+1}/{epochs}, Batch {batch_idx+1}/{len(train_loader)}, Loss: {loss.item():.4f}")
+        
+        avg_train_loss = total_train_loss / len(train_loader)
+        train_losses.append(avg_train_loss)
+        
+        # Validation
+        model.eval()
+        val_predictions = []
+        val_true_labels = []
+        
+        with torch.no_grad():
+            for batch in val_loader:
+                input_ids, attention_mask, labels = [b.to(device) for b in batch]
+                
+                outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+                logits = outputs.logits
+                
+                predictions = torch.argmax(logits, dim=1)
+                
+                val_predictions.extend(predictions.cpu().numpy())
+                val_true_labels.extend(labels.cpu().numpy())
+        
+        val_accuracy = accuracy_score(val_true_labels, val_predictions)
+        val_accuracies.append(val_accuracy)
+        
+        print(f"Epoch {epoch+1}/{epochs}")
+        print(f"  Train Loss: {avg_train_loss:.4f}")
+        print(f"  Val Accuracy: {val_accuracy:.4f}")
+        print("-" * 50)
+    
+    return model, train_losses, val_accuracies, val_predictions, val_true_labels
+
+import matplotlib.pyplot as plt
+from sklearn.metrics import classification_report, confusion_matrix
+import seaborn as sns
+
+def evaluate_classification_model(model, data, target_names=['Negative', 'Positive'], batch_size=16):
+    """
+    Evaluates a classification model on a dataset and displays the results.
+    
+    Args:
+        model: The trained model to evaluate
+        data: Either a TensorDataset containing input_ids, attention_mask, and labels,
+              or a tuple of (X, y) where X can be input features and y is the ground truth labels
+        target_names: Names of the classes for the classification report, can be a list or a dictionary mapping class indices to names
+        batch_size: Batch size for evaluation
+    """
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+    model.eval()
+    
+    # Handle different input types
+    if isinstance(data, TensorDataset):
+        # Create DataLoader for TensorDataset
+        dataloader = DataLoader(data, batch_size=batch_size, shuffle=False)
+        is_language_model = True
+    else:
+        # Assume data is a tuple of (X, y)
+        X, y = data
+        if isinstance(X, torch.Tensor) and isinstance(y, torch.Tensor):
+            # Create DataLoader for tensor inputs
+            dataset = TensorDataset(X, y)
+            dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+            is_language_model = False
+        else:
+            raise ValueError("If providing X and y separately, both must be torch.Tensor objects")
+    
+    # Get predictions
+    predictions = []
+    true_labels = []
+    
+    with torch.no_grad():
+        for batch in dataloader:
+            if is_language_model:
+                input_ids, attention_mask, labels = [b.to(device) for b in batch]
+                outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            else:
+                inputs, labels = [b.to(device) for b in batch]
+                outputs = model(inputs)
+                
+            # Get predictions based on model output format
+            if hasattr(outputs, 'logits'):
+                logits = outputs.logits
+            else:
+                logits = outputs
+                
+            preds = torch.argmax(logits, dim=1)
+            
+            predictions.extend(preds.cpu().numpy())
+            true_labels.extend(labels.cpu().numpy())
+    
+    # Handle 2D label tensors (common in many datasets)
+    if len(true_labels) > 0 and hasattr(true_labels[0], "__len__"):
+        true_labels = [label[0] for label in true_labels]
+    
+    # Convert dictionary target_names to list for classification_report
+    display_target_names = target_names
+    if isinstance(target_names, dict):
+        # Sort by keys to ensure correct order
+        sorted_keys = sorted(target_names.keys())
+        display_target_names = [target_names[k] for k in sorted_keys]
+    
+    # Classification report
+    print("Classification Report:")
+    print(classification_report(true_labels, predictions, target_names=display_target_names))
+    
+    # Confusion matrix
+    cm = confusion_matrix(true_labels, predictions)
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                xticklabels=display_target_names, yticklabels=display_target_names)
+    plt.title('Confusion Matrix')
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
+    plt.tight_layout()
+    plt.show()
+    
+    return predictions, true_labels
+
+def plot_loss_curves(loss_lists, labels, title="Loss Curves"):
+    """
+    Plots loss curves for multiple training runs.
+
+    Args:
+        loss_lists (list of list): Each inner list contains loss values per epoch for a run.
+        labels (list of str): Labels for each loss curve.
+    """
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(10, 6))
+    for losses, label in zip(loss_lists, labels):
+        plt.plot(losses, label=label)
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.title(title)
+    plt.legend()
+    plt.grid(alpha=0.3)
+    plt.tight_layout()
