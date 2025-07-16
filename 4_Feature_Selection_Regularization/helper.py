@@ -2115,6 +2115,13 @@ def compare_all_Algorithms(X_raw_scaled, X_pca, y_true, pca, labels_pca):
     plt.show()
 
 ### Feature Selection
+from statsmodels.api import OLS, add_constant
+
+def print_regression_table(X, y):
+  
+    X_const = add_constant(X)
+    model = OLS(y, X_const).fit()
+    print(model.summary())
 
 def generate_regression(n_samples=12, n_features=15, n_informative=1, coef=[2], noise=1.5, test_data=True, plot=True, corr=False):
     """
@@ -2513,6 +2520,89 @@ def plot_coefs(coefs, title='True Coefficient Values'):
     plt.axhline(y=0, color='black', linestyle='-', alpha=0.3)
     plt.grid(True, alpha=0.3)
     plt.show()
+
+# we could adjust this function such that it could also handle multiple l1 ratios in elastic net
+def plot_regularization_path(fitted_cv_model, model_name="Ridge"):
+    """
+    Plots the cross-validation error from a fitted CV model and highlights the optimal alpha.
+    """
+    
+    # Extract alphas from fitted model
+    if hasattr(fitted_cv_model, 'alphas'):
+        alphas = fitted_cv_model.alphas
+    elif hasattr(fitted_cv_model, 'alphas_'):
+        alphas = fitted_cv_model.alphas_
+    else:
+        raise ValueError("Model does not have alphas or alphas_ attribute")
+    
+    # Handle different CV score attributes
+    if hasattr(fitted_cv_model, 'mse_path_'):
+        cv_values = fitted_cv_model.mse_path_[::-1]
+        cv_scores = np.mean(cv_values, axis=1)
+        cv_stds = np.std(cv_values, axis=1)
+    elif hasattr(fitted_cv_model, 'cv_values_'):
+        cv_values = fitted_cv_model.cv_values_
+        cv_scores = np.mean(cv_values, axis=0)
+        cv_stds = np.std(cv_values, axis=0)
+    else:
+        raise ValueError("Model does not have cv_values_ or mse_path_ attribute")
+    
+    # Debug: Print shapes
+    print(f"Alphas length: {len(alphas)}")
+    print(f"CV scores length: {len(cv_scores)}")
+    print(f"CV stds length: {len(cv_stds)}")
+    
+    # Fix: Ensure all arrays have the same length
+    min_length = min(len(alphas), len(cv_scores), len(cv_stds))
+    alphas = alphas[:min_length]
+    cv_scores = cv_scores[:min_length]
+    cv_stds = cv_stds[:min_length]
+    
+    # Remove any NaN or infinite values
+    valid_mask = np.isfinite(alphas) & np.isfinite(cv_scores) & np.isfinite(cv_stds)
+    alphas = alphas[valid_mask]
+    cv_scores = cv_scores[valid_mask]
+    cv_stds = cv_stds[valid_mask]
+    
+    if len(alphas) == 0:
+        print("Warning: No valid alpha/score pairs found after filtering")
+        return fitted_cv_model.alpha_
+    
+    # Plot results
+    plt.figure(figsize=(12, 8))
+    plt.errorbar(np.log10(alphas), cv_scores, yerr=cv_stds, 
+                marker='o', markersize=4, capsize=3, capthick=1,
+                color='red', ecolor='gray', alpha=0.8)
+    
+    # Get optimal alpha from fitted model
+    optimal_alpha = fitted_cv_model.alpha_
+    
+    # Find optimal score for plotting (handle case where optimal alpha might not be in filtered data)
+    try:
+        optimal_idx = np.where(np.abs(alphas - optimal_alpha) < 1e-10)[0][0]
+        optimal_score = cv_scores[optimal_idx]
+        
+        # Mark optimal point
+        plt.axvline(x=np.log10(optimal_alpha), color='black', linestyle='--', alpha=0.7)
+        plt.plot(np.log10(optimal_alpha), optimal_score, 'ko', markersize=8, 
+                label=f'Optimal α = {optimal_alpha:.3f}')
+    except IndexError:
+        # If optimal alpha not found in filtered data, just mark the line
+        plt.axvline(x=np.log10(optimal_alpha), color='black', linestyle='--', alpha=0.7,
+                   label=f'Optimal α = {optimal_alpha:.3f}')
+        print(f"Warning: Optimal alpha {optimal_alpha} not found in filtered data")
+    
+    # Formatting
+    plt.xlabel('Log(α)', fontsize=12)
+    plt.ylabel('Mean-Squared Error', fontsize=12)
+    plt.title(f'{model_name} Regression: Cross-Validation Performance vs Regularization Strength', fontsize=14)
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    
+    plt.tight_layout()
+    plt.show()
+    
+    return optimal_alpha
 
 def cross_validate_regularization(X, y, num_coef=8, alphas=np.logspace(-3, 3, 50), model_name="Ridge"):
     """
