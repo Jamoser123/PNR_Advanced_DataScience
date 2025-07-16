@@ -1185,13 +1185,24 @@ def simulate_clean_dataset(n_samples=300, n_features=2, centers=4, cluster_std=0
 
     return X_clean, y_true
 
-def print_cluster_information_table(X, cluster_labels):
+def print_cluster_information_table(X, cluster_labels, features=None):
     """
-    Print cluster information in table format with enhanced categorical info
+    Print cluster information in table format for selected features only.
+    Only the features specified in the `features` list will be included in the output.
     """
+    if features is None or len(features) == 0:
+        features = X.columns.tolist()
+    else:
+        # Ensure features exist in X
+        features = [f for f in features if f in X.columns]
+
     unique_clusters = np.unique(cluster_labels)
-    interpretation = pd.DataFrame(index=X.columns)
-    
+    interpretation = pd.DataFrame(index=features)
+
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.width', None)
+    pd.set_option('display.max_colwidth', None)
+
     # Calculate means/modes for each cluster
     for cluster_id in unique_clusters:
         mask = cluster_labels == cluster_id
@@ -1199,7 +1210,8 @@ def print_cluster_information_table(X, cluster_labels):
         cluster_size = np.sum(mask)
         
         cluster_info = []
-        for col in X.columns:
+        # CHANGE THIS LINE: iterate through selected features only, not all columns
+        for col in features:  # Changed from X.columns to features
             if pd.api.types.is_numeric_dtype(X[col]):
                 # For numeric columns, calculate mean
                 mean_val = cluster_data[col].mean()
@@ -1231,15 +1243,29 @@ def print_cluster_information_table(X, cluster_labels):
     print(interpretation)
     print("=" * 80)
 
-def print_centroid_information(X, kmeans_centroids, scaler):
+def print_centroid_information(X, kmeans_centroids, scaler, features=[]):
+    """
+    Prints centroid values for specified features only.
+
+    Args:
+        X (pd.DataFrame): Original data (used for column names).
+        kmeans_centroids (np.ndarray): Centroid coordinates (in scaled space).
+        scaler: Scaler used for normalization (must support inverse_transform).
+        features (list): List of feature names to display.
+
+    Returns:
+        None
+    """
+    # Inverse transform centroids to original scale
     original_scale_centroids = scaler.inverse_transform(kmeans_centroids)
     centroids_df_original = pd.DataFrame(original_scale_centroids, columns=X.columns)
 
-    # Create a more meaningful interpretation table
-    interpretation = pd.DataFrame(index=X.columns)
+    # Filter to only requested features
+    selected_features = features if features else X.columns.tolist()
+    interpretation = pd.DataFrame(index=selected_features)
 
-    for i in range(3):
-        interpretation[f'Cluster {i}'] = centroids_df_original.iloc[i].values
+    for i in range(centroids_df_original.shape[0]):
+        interpretation[f'Cluster {i}'] = centroids_df_original.loc[:, selected_features].iloc[i].values
 
     print(interpretation)
 
@@ -1381,8 +1407,8 @@ def plot_kmeans_clusters(X, labels, centroids=None, title="K-Means Clustering Re
         plt.scatter(centroids[:, 0], centroids[:, 1], c='red', marker='X', s=300, 
                 edgecolors='black', linewidth=2, label='Centroids')
     plt.title(title, fontsize=14, fontweight='bold')
-    plt.xlabel('Feature 1')
-    plt.ylabel('Feature 2')
+    plt.xlabel('Component 1')
+    plt.ylabel('Component 2')
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -1571,26 +1597,47 @@ def compare_kmeans_kmedoids(X, kmeans_labels, kmeans_centroids, kmedoids_labels,
     plt.tight_layout()
     plt.show()
 
-def plot_hierarchical_clustering(X, linkage_matrix, cluster_labels, title):
-    """
-    Visualizes hierarchical clustering results using a dendrogram and optionally a scatter plot.
-    This function creates a figure with one or two subplots:
-    - Always displays the dendrogram of the hierarchical clustering, highlighting the cut threshold for the specified number of clusters.
-    - Only shows a scatter plot of the clustered data points (colored by cluster assignment) if X has exactly 2 dimensions.
-    Args:
-        X (np.ndarray): The data matrix of shape (n_samples, n_features), where each row represents a data point.
-        linkage_matrix (np.ndarray): The linkage matrix produced by hierarchical clustering algorithms (e.g., scipy's `linkage` function).
-        cluster_labels (np.ndarray): Array of cluster labels for each data point, typically obtained from `fcluster`.
-        title (str): The overall title for the figure.
-    Returns:
-        None: This function displays the plots and does not return any value.
-    """
-    num_clusters = len(np.unique(cluster_labels))
-    cluster_colors = ['red', 'blue', 'green', 'orange']
+def plot_dendrogram(full_model, data=None, cluster_labels=None, data_reduced=None, num_clusters=None, title="", **kwargs):
+    # Create linkage matrix and then plot the dendrogram
+
+    if not hasattr(full_model, 'children_') or not hasattr(full_model, 'distances_'):
+        raise ValueError("The provided model does not have the required attributes 'children_' and 'distances_'. Did you provide the full model?")
+
+    # create the counts of samples under each node
+    counts = np.zeros(full_model.children_.shape[0])
+    n_samples = len(full_model.labels_)
+    for i, merge in enumerate(full_model.children_):
+        current_count = 0
+        for child_idx in merge:
+            if child_idx < n_samples:
+                current_count += 1  # leaf node
+            else:
+                current_count += counts[child_idx - n_samples]
+        counts[i] = current_count
+
+    linkage_matrix = np.column_stack(
+        [full_model.children_, full_model.distances_, counts]
+    ).astype(float)
+
+    threshold = linkage_matrix[-(num_clusters-1), 2] if num_clusters is not None else None
+
+    # Auto-generate cluster labels if not provided but num_clusters is specified
+    if cluster_labels is None and num_clusters is not None and data is not None:
+        from sklearn.cluster import AgglomerativeClustering
+        clustering = AgglomerativeClustering(
+            n_clusters=num_clusters,
+            metric='precomputed' if hasattr(full_model, 'metric') and full_model.metric == 'precomputed' else 'euclidean',
+            linkage=full_model.linkage if hasattr(full_model, 'linkage') else 'ward'
+        )
+        cluster_labels = clustering.fit_predict(data)
+
+    # Use data parameter if provided, otherwise fall back to global X
+    plot_data = data_reduced if data_reduced is not None else None
     
-    # Check if we can create scatter plot (only for 2D data)
-    can_plot_scatter = X.shape[1] == 2
-    
+    can_plot_scatter = (plot_data is not None and 
+                       plot_data.shape[1] == 2 and 
+                       cluster_labels is not None)
+
     if can_plot_scatter:
         # Create figure with two subplots
         fig, axes = plt.subplots(1, 2, figsize=(16, 6))
@@ -1599,46 +1646,41 @@ def plot_hierarchical_clustering(X, linkage_matrix, cluster_labels, title):
     else:
         # Create figure with only dendrogram
         fig, ax1 = plt.subplots(1, 1, figsize=(8, 6))
-        #print(f"Note: Scatter plot not shown as data has {X.shape[1]} dimensions (only 2D data can be visualized)")
-    
-    # Left (or only): Dendrogram
-    threshold = linkage_matrix[-(num_clusters-1), 2]  # For specified number of clusters
 
-    dend = dendrogram(linkage_matrix, 
-                            #truncate_mode='level',
-                            p=10,  # Show more nodes
-                            leaf_rotation=90,
-                            leaf_font_size=6,
-                            show_leaf_counts=True,  # Show cluster sizes
-                            color_threshold=threshold,
-                            ax=ax1)
+    # Plot the corresponding dendrogram
+    dendrogram(linkage_matrix, p=10, leaf_rotation=90, leaf_font_size=6, 
+              show_leaf_counts=True, color_threshold=threshold, ax=ax1, **kwargs)
 
-    ax1.axhline(y=threshold, color='blue', linestyle='--', linewidth=3,
+    if threshold is not None:
+        ax1.axhline(y=threshold, color='blue', linestyle='--', linewidth=3,
             label=f'Cut for {num_clusters} clusters')
+        ax1.legend()
     ax1.set_title('Dendrogram', fontsize=14, fontweight='bold')
     ax1.set_xlabel('Data Samples', fontsize=12)
-    ax1.set_ylabel('Distance (Average Linkage)', fontsize=12)
-    ax1.legend()
+    ax1.set_ylabel('Distance', fontsize=12)
     ax1.set_xticks([])
 
-    # Right: Clustering Visualization (only if 2D)
     if can_plot_scatter:
+        # Define colors (you might need to adjust this based on your setup)
+        cluster_colors = plt.cm.tab10(np.linspace(0, 1, num_clusters))
+        
         for cluster_id in range(num_clusters):
             mask = cluster_labels == cluster_id
             cluster_size = np.sum(mask)
-            ax2.scatter(X[mask, 0], X[mask, 1], 
-                    c=cluster_colors[cluster_id], s=50, alpha=0.7,
+            ax2.scatter(plot_data[mask, 0], plot_data[mask, 1], 
+                    c=[cluster_colors[cluster_id]], s=50, alpha=0.7,
                     label=f'Cluster {cluster_id} (n={cluster_size})')
 
         ax2.set_title('Clustering Results', fontsize=14, fontweight='bold')
-        ax2.set_xlabel('Feature 1', fontsize=12)
-        ax2.set_ylabel('Feature 2', fontsize=12)
+        ax2.set_xlabel('Component 1', fontsize=12)
+        ax2.set_ylabel('Component 2', fontsize=12)
         ax2.legend()
         ax2.grid(True, alpha=0.3)
 
     plt.tight_layout()
     plt.suptitle(title, fontsize=16, fontweight='bold', y=1.02)
     plt.show()
+    
 
 def generate_moons_data(n_samples=300, noise=0.2, random_state=42, plot=True):
     """
