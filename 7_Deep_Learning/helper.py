@@ -3174,13 +3174,17 @@ def plot_random_forest_accuracy(X_train, y_train, X_test, y_test, max_trees=100)
     plt.tight_layout()
     plt.show()
 
-def simple_feature_importance(X, tree):
+import matplotlib.pyplot as plt
+import seaborn as sns
+def simple_feature_importance(X, tree, title='Feature Importance in Heart Disease Prediction', ax=None):
     """
     Displays and visualizes the feature importances from a fitted decision tree model.
     Args:
         X (pd.DataFrame): The input feature set used to train the decision tree. Must have column names.
         tree (sklearn.tree.DecisionTreeClassifier or DecisionTreeRegressor): 
             A fitted decision tree model with the `feature_importances_` attribute.
+        title (str, optional): The title of the plot. Defaults to 'Feature Importance in Heart Disease Prediction'.
+        ax (matplotlib.axes.Axes, optional): Matplotlib axis to plot on. If None, creates a new figure.
     Returns:
         None: This function displays a bar plot of feature importances and does not return any value.
     Raises:
@@ -3188,6 +3192,9 @@ def simple_feature_importance(X, tree):
         AttributeError: If `X` does not have a `columns` attribute.
     Example:
         >>> simple_feature_importance(X_train, clf)
+        >>> # Or with subplot:
+        >>> fig, ax = plt.subplots()
+        >>> simple_feature_importance(X_train, clf, ax=ax)
     """
     # Show feature importance
     feature_importance = pd.DataFrame({
@@ -3195,13 +3202,23 @@ def simple_feature_importance(X, tree):
         'importance': tree.feature_importances_
     }).sort_values('importance', ascending=False)
 
+    # Create figure/axis if not provided
+    if ax is None:
+        plt.figure(figsize=(10, 6))
+        ax = plt.gca()
+        show_plot = True
+    else:
+        show_plot = False
+
     # Visualize feature importance
-    plt.figure(figsize=(10, 6))
-    sns.barplot(data=feature_importance, x='importance', y='feature', palette='viridis')
-    plt.title('Feature Importance in Heart Disease Prediction')
-    plt.xlabel('Importance Score')
-    plt.tight_layout()
-    plt.show()
+    sns.barplot(data=feature_importance, x='importance', y='feature', palette='viridis', ax=ax)
+    ax.set_title(title)
+    ax.set_xlabel('Importance Score')
+    
+    # Only show if we created our own figure
+    if show_plot:
+        plt.tight_layout()
+        plt.show()
 
 def compare_feature_importance(X, tree1, tree1_name, tree2, tree2_name):
     """
@@ -3840,18 +3857,25 @@ def evaluate_roc(X, y, model=None, model_name=None, models=None, model_names=Non
     # Store results for reporting
     all_results = {}
     
-    # Process each model
     for i, (model, name) in enumerate(zip(models, model_names)):
-        # Get probability predictions using cross-validation
-        y_proba = cross_val_predict(model, X, y, cv=5, method='predict_proba')
-        
+        # Try to use predict_proba, else use decision_function
+        if hasattr(model, "predict_proba"):
+            y_score = cross_val_predict(model, X, y, cv=5, method='predict_proba')[:, 1]
+        elif hasattr(model, "decision_function"):
+            y_score = cross_val_predict(model, X, y, cv=5, method='decision_function')
+            # If output is 2D, use the positive class column
+            if y_score.ndim > 1 and y_score.shape[1] == 2:
+                y_score = y_score[:, 1]
+        else:
+            raise ValueError(f"Model {name} does not support probability or decision_function output.")
+
         # Calculate ROC curve
-        fpr, tpr, thresholds = roc_curve(y, y_proba[:, 1])
+        fpr, tpr, thresholds = roc_curve(y, y_score)
         roc_auc = auc(fpr, tpr)
-        
+
         # Also get AUC scores from cross-validation
         auc_scores = cross_validate(model, X, y, cv=5, scoring='roc_auc')['test_score']
-        
+
         # Store results
         all_results[name] = {
             'cv_auc_mean': auc_scores.mean(),
@@ -3860,7 +3884,7 @@ def evaluate_roc(X, y, model=None, model_name=None, models=None, model_names=Non
             'fpr': fpr,
             'tpr': tpr
         }
-        
+
         # Plot ROC curve
         color = colors[i % len(colors)]
         ax.plot(fpr, tpr, color=color, lw=2, 
@@ -6868,3 +6892,36 @@ def plot_loss_curves(loss_lists, labels, title="Loss Curves"):
     plt.legend()
     plt.grid(alpha=0.3)
     plt.tight_layout()
+
+def coef_feature_importance(X, model, title='SVM Feature Importance', ax=None):
+    """
+    Displays and visualizes feature importance for a linear SVM model.
+    Args:
+        X (pd.DataFrame): Feature set used to train the SVM.
+        model (sklearn.svm.SVC or LinearSVC): Fitted linear SVM model.
+        title (str): Plot title.
+        ax (matplotlib.axes.Axes, optional): Subplot to plot into. If None, creates a new figure.
+    """
+    if not hasattr(model, "coef_"):
+        raise AttributeError("SVM model must be linear and fitted (have .coef_ attribute).")
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    coefs = model.coef_
+    if coefs.ndim > 1:
+        coefs = coefs[0]  # Take the first row if multiple classes
+    feature_importance = pd.DataFrame({
+        'feature': X.columns,
+        'importance': abs(coefs)
+    }).sort_values('importance', ascending=False)
+
+    if ax is None:
+        plt.figure(figsize=(10, 6))
+        ax = plt.gca()
+    sns.barplot(data=feature_importance, x='importance', y='feature', palette='viridis', ax=ax)
+    ax.set_title(title)
+    ax.set_xlabel('Absolute Coefficient')
+    plt.tight_layout()
+    if ax is None or not plt.get_fignums():
+        plt.show()

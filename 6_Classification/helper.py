@@ -3107,13 +3107,15 @@ def plot_random_forest_accuracy(X_train, y_train, X_test, y_test, max_trees=100)
     plt.tight_layout()
     plt.show()
 
-def simple_feature_importance(X, tree, title='Feature Importance in Heart Disease Prediction'):
+def simple_feature_importance(X, tree, title='Feature Importance in Heart Disease Prediction', ax=None):
     """
     Displays and visualizes the feature importances from a fitted decision tree model.
     Args:
         X (pd.DataFrame): The input feature set used to train the decision tree. Must have column names.
         tree (sklearn.tree.DecisionTreeClassifier or DecisionTreeRegressor): 
             A fitted decision tree model with the `feature_importances_` attribute.
+        title (str, optional): The title of the plot. Defaults to 'Feature Importance in Heart Disease Prediction'.
+        ax (matplotlib.axes.Axes, optional): Matplotlib axis to plot on. If None, creates a new figure.
     Returns:
         None: This function displays a bar plot of feature importances and does not return any value.
     Raises:
@@ -3121,6 +3123,9 @@ def simple_feature_importance(X, tree, title='Feature Importance in Heart Diseas
         AttributeError: If `X` does not have a `columns` attribute.
     Example:
         >>> simple_feature_importance(X_train, clf)
+        >>> # Or with subplot:
+        >>> fig, ax = plt.subplots()
+        >>> simple_feature_importance(X_train, clf, ax=ax)
     """
     # Show feature importance
     feature_importance = pd.DataFrame({
@@ -3128,13 +3133,23 @@ def simple_feature_importance(X, tree, title='Feature Importance in Heart Diseas
         'importance': tree.feature_importances_
     }).sort_values('importance', ascending=False)
 
+    # Create figure/axis if not provided
+    if ax is None:
+        plt.figure(figsize=(10, 6))
+        ax = plt.gca()
+        show_plot = True
+    else:
+        show_plot = False
+
     # Visualize feature importance
-    plt.figure(figsize=(10, 6))
-    sns.barplot(data=feature_importance, x='importance', y='feature', palette='viridis')
-    plt.title(title)
-    plt.xlabel('Importance Score')
-    plt.tight_layout()
-    plt.show()
+    sns.barplot(data=feature_importance, x='importance', y='feature', palette='viridis', ax=ax)
+    ax.set_title(title)
+    ax.set_xlabel('Importance Score')
+    
+    # Only show if we created our own figure
+    if show_plot:
+        plt.tight_layout()
+        plt.show()
 
 def compare_feature_importance(X, tree1, tree1_name, tree2, tree2_name):
     """
