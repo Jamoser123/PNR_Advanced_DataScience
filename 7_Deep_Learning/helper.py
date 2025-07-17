@@ -5771,9 +5771,10 @@ def train_model(model, X_train_tensor, y_train_tensor, X_test_tensor, y_test_ten
         num_epochs (int, optional): Number of training epochs. Defaults to 200.
         print_every (int, optional): Print progress every `print_every` epochs. Defaults to 20.
     Returns:
-        tuple: A tuple (train_losses, test_losses) where:
+        tuple: A tuple (train_losses, test_losses, final_test_accuracy) where:
             - train_losses (list of float): Training loss for each epoch.
             - test_losses (list of float): Test loss for each epoch.
+            - final_test_accuracy (float): Test accuracy on the final epoch (for classification tasks only, None for regression).
     Raises:
         ValueError: If a non-finite loss is encountered during training.
     Notes:
@@ -5872,10 +5873,11 @@ def train_model(model, X_train_tensor, y_train_tensor, X_test_tensor, y_test_ten
     # Training setup
     train_losses = []
     test_losses = []
+    final_test_accuracy = None
     
     print("")
-    print("Epoch | Train Loss | Test Loss  | LR")
-    print("-" * 45)
+    print("Epoch | Train Loss | Test Loss  | Test Acc | LR")
+    print("-" * 55)
     
     # Training loop
     for epoch in range(num_epochs):
@@ -5901,7 +5903,7 @@ def train_model(model, X_train_tensor, y_train_tensor, X_test_tensor, y_test_ten
                 print(f"\nERROR: Non-finite loss at epoch {epoch}")
                 print(f"Outputs range: [{outputs.min().item():.4f}, {outputs.max().item():.4f}]")
                 print(f"Targets range: [{batch_y.min().item():.4f}, {batch_y.max().item():.4f}]")
-                return train_losses, test_losses
+                return train_losses, test_losses, final_test_accuracy
             
             # Backward pass
             loss.backward()
@@ -5922,6 +5924,23 @@ def train_model(model, X_train_tensor, y_train_tensor, X_test_tensor, y_test_ten
                 test_loss = criterion(test_outputs, y_test_tensor.squeeze()).item()
             else:
                 test_loss = criterion(test_outputs, y_test_tensor).item()
+            
+            # Calculate test accuracy for classification tasks
+            test_accuracy = None
+            if task_type in ['classification', 'multiclass']:
+                if task_type == 'classification':
+                    # Binary classification - apply sigmoid and threshold at 0.5
+                    test_probs = torch.sigmoid(test_outputs)
+                    test_predictions = (test_probs > 0.5).float()
+                    test_accuracy = (test_predictions == y_test_tensor).float().mean().item()
+                else:
+                    # Multi-class classification - use argmax
+                    test_predictions = torch.argmax(test_outputs, dim=1)
+                    test_accuracy = (test_predictions == y_test_tensor.squeeze()).float().mean().item()
+                
+                # Store final test accuracy
+                if epoch == num_epochs - 1:
+                    final_test_accuracy = test_accuracy
         
         train_losses.append(train_loss)
         test_losses.append(test_loss)
@@ -5929,10 +5948,16 @@ def train_model(model, X_train_tensor, y_train_tensor, X_test_tensor, y_test_ten
         # Print progress
         if (epoch + 1) % print_every == 0 or epoch == 0:
             current_lr = optimizer.param_groups[0]['lr']
-            print(f"{epoch+1:5d} | {train_loss:10.4f} | {test_loss:9.4f} | {current_lr:.6f}")
+            if test_accuracy is not None:
+                print(f"{epoch+1:5d} | {train_loss:10.4f} | {test_loss:9.4f} | {test_accuracy:8.4f} | {current_lr:.6f}")
+            else:
+                print(f"{epoch+1:5d} | {train_loss:10.4f} | {test_loss:9.4f} | {'N/A':>8s} | {current_lr:.6f}")
     
     print("Training completed!")
-    return train_losses, test_losses
+    if final_test_accuracy is not None:
+        print(f"Final test accuracy: {final_test_accuracy:.4f}")
+    
+    return train_losses, test_losses, final_test_accuracy
 
 def compare_regression_models(nn_model, lr_model, rf_model, gb_model, X_train_tensor, y_train_tensor, X_test_tensor, y_test_tensor):
     """
@@ -6734,6 +6759,13 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report, confusion_matrix
 import seaborn as sns
 
+
+import torch
+from torch.utils.data import DataLoader, TensorDataset
+from sklearn.metrics import accuracy_score, confusion_matrix
+import seaborn as sns
+
+
 def evaluate_classification_model(model, data, target_names=['Negative', 'Positive'], batch_size=16):
     """
     Evaluates a classification model on a dataset and displays the results.
@@ -6793,16 +6825,16 @@ def evaluate_classification_model(model, data, target_names=['Negative', 'Positi
     if len(true_labels) > 0 and hasattr(true_labels[0], "__len__"):
         true_labels = [label[0] for label in true_labels]
     
-    # Convert dictionary target_names to list for classification_report
+    # Convert dictionary target_names to list for confusion matrix
     display_target_names = target_names
     if isinstance(target_names, dict):
         # Sort by keys to ensure correct order
         sorted_keys = sorted(target_names.keys())
         display_target_names = [target_names[k] for k in sorted_keys]
     
-    # Classification report
-    print("Classification Report:")
-    print(classification_report(true_labels, predictions, target_names=display_target_names))
+    # Calculate and print accuracy
+    accuracy = accuracy_score(true_labels, predictions)
+    print(f"Accuracy: {accuracy:.4f}")
     
     # Confusion matrix
     cm = confusion_matrix(true_labels, predictions)
