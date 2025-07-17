@@ -4250,7 +4250,9 @@ def coef_feature_importance(X, model, title='SVM Feature Importance', ax=None):
     import matplotlib.pyplot as plt
     import seaborn as sns
 
-    coefs = model.coef_[0]
+    coefs = model.coef_
+    if coefs.ndim > 1:
+        coefs = coefs[0]  # Take the first row if multiple classes
     feature_importance = pd.DataFrame({
         'feature': X.columns,
         'importance': abs(coefs)
