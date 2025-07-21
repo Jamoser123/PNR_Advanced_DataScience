@@ -1046,7 +1046,7 @@ def plot_similarity_matrices(similarity_matrices, y, titles, suptitle=""):
         similarity_matrices = [similarity_matrices]
     
     if y is None:
-        y = np.zeros(X.shape[0])  # Default to a single category if no labels are provided
+        raise ValueError("The 'y' parameter must not be None. Provide category labels for the samples.")
     
     # Get unique categories and their first samples
     unique_categories = np.unique(y)
