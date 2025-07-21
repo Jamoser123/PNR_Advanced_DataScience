@@ -2529,7 +2529,10 @@ def plot_regularization_path(fitted_cv_model, model_name="Ridge"):
     
     # Extract alphas from fitted model
     if hasattr(fitted_cv_model, 'alphas'):
-        alphas = fitted_cv_model.alphas
+        if fitted_cv_model.alphas is not None:
+            alphas = fitted_cv_model.alphas
+        elif hasattr(fitted_cv_model, 'alphas_'):
+            alphas = fitted_cv_model.alphas_[::-1]
     elif hasattr(fitted_cv_model, 'alphas_'):
         alphas = fitted_cv_model.alphas_
     else:
