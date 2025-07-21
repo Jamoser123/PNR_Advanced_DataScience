@@ -5186,7 +5186,7 @@ def plot_training_loss(losses, test_losses=None, epochs_to_show=None, title='Neu
     plt.figure(figsize=(8, 6))
     plt.plot(range(len(losses)), losses, 'b-', linewidth=2, label='Training Loss')
     if test_losses is not None:
-        plt.plot(range(len(test_losses)), test_losses, 'r--', linewidth=2, label='Test Loss')
+        plt.plot(range(len(test_losses)), test_losses, 'b--', linewidth=2, label='Test Loss')
     plt.xlabel('Epoch', fontsize=14)
     plt.ylabel('Loss', fontsize=14)
     plt.title(title, fontsize=16, fontweight='bold')
