@@ -2117,11 +2117,22 @@ def compare_all_Algorithms(X_raw_scaled, X_pca, y_true, pca, labels_pca):
 ### Feature Selection
 from statsmodels.api import OLS, add_constant
 
-def print_regression_table(X, y):
-  
+def print_regression_table(X, y, max_features=20):
+    from statsmodels.api import add_constant, OLS
+    
     X_const = add_constant(X)
     model = OLS(y, X_const).fit()
-    print(model.summary())
+    
+    if X.shape[1] > max_features:
+        # Just print key stats + first N coefficients
+        print(f"R²: {model.rsquared:.4f}, Adj R²: {model.rsquared_adj:.4f}, F: {model.fvalue:.2f}")
+        print(f"Features: {X.shape[1]}, Observations: {int(model.nobs)}")
+        print(f"\nFirst {max_features} coefficients:")
+        coef_df = model.summary2().tables[1][['Coef.', 'P>|t|']]
+        print(coef_df.head(max_features))
+    else:
+        print(model.summary(slim=True))
+
 
 def generate_regression(n_samples=12, n_features=15, n_informative=1, coef=[2], noise=1.5, test_data=True, plot=True, corr=False):
     """
